@@ -2,6 +2,7 @@ package diagnostic
 
 import (
 	"fmt"
+	"net"
 	"sort"
 	"strings"
 
@@ -246,9 +247,15 @@ func isPrivateIP(ip string) bool {
 		"172.16.0.0/12",
 		"192.168.0.0/16",
 		"169.254.0.0/16",
+		"127.0.0.0/8",
+	}
+	parsedIP := net.ParseIP(ip)
+	if parsedIP == nil {
+		return false
 	}
 	for _, block := range privateBlocks {
-		if strings.HasPrefix(ip, block[:strings.Index(block, "/")]) {
+		_, cidr, err := net.ParseCIDR(block)
+		if err == nil && cidr.Contains(parsedIP) {
 			return true
 		}
 	}
