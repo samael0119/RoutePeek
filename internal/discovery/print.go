@@ -6,8 +6,8 @@ import (
 	"os"
 	"text/tabwriter"
 
-	"github.com/netscope/internal/diagnostic"
-	"github.com/netscope/pkg/types"
+	"github.com/routepeek/internal/diagnostic"
+	"github.com/routepeek/pkg/types"
 )
 
 // PrintJSON prints the given data as formatted JSON
@@ -21,7 +21,7 @@ func PrintJSON(data interface{}) {
 func PrintNetworkOverview(s *types.NetworkSnapshot, color bool) {
 	fmt.Println()
 	fmt.Println("╔══════════════════════════════════════════════════════════════════════╗")
-	fmt.Println("║                     NetScope - 网络配置总览                          ║")
+	fmt.Println("║                     RoutePeek - 网络配置总览                          ║")
 	fmt.Println("╚══════════════════════════════════════════════════════════════════════╝")
 	fmt.Println()
 

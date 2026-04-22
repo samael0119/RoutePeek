@@ -1,4 +1,4 @@
-# NetScope - 网络拓扑可视化与诊断工具
+# RoutePeek - 网络拓扑可视化与诊断工具
 
 一款面向网络小白的跨平台网络配置可视化工具，帮助用户理解多网卡、VPN、代理、虚拟机等复杂网络环境。
 
@@ -73,24 +73,24 @@
 
 ```bash
 # 编译
-go build -o netscope ./cmd/cli
-go build -o netscope-web ./cmd/server
+go build -o RoutePeek ./cmd/cli
+go build -o RoutePeek-web ./cmd/server
 
 # 命令行使用
-./netscope scan          # 查看完整网络配置
-./netscope diag          # 运行网络诊断
-./netscope routes        # 查看路由表
-./netscope interfaces    # 查看网卡详情
+./RoutePeek scan          # 查看完整网络配置
+./RoutePeek diag          # 运行网络诊断
+./RoutePeek routes        # 查看路由表
+./RoutePeek interfaces    # 查看网卡详情
 
 # Web 界面
-./netscope-web           # 启动 Web 服务器（默认 8080 端口）
+./RoutePeek-web           # 启动 Web 服务器（默认 8080 端口）
 ```
 
 ## 输出示例
 
 ```
 ╔══════════════════════════════════════════════════════════════╗
-║                     NetScope - 网络配置总览                  ║
+║                     RoutePeek - 网络配置总览                  ║
 ╚══════════════════════════════════════════════════════════════╝
 
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -126,7 +126,7 @@ go build -o netscope-web ./cmd/server
 ## 项目结构
 
 ```
-netscope/
+RoutePeek/
 ├── cmd/
 │   ├── cli/main.go          # CLI 入口（Cobra）
 │   └── server/main.go       # Web 服务器入口

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/netscope/internal/discovery"
+	"github.com/routepeek/internal/discovery"
 	"github.com/spf13/cobra"
 )
 
@@ -14,9 +14,9 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "netscope",
-	Short: "NetScope - Network topology visualization and diagnostic tool",
-	Long: `NetScope helps you understand your machine's network configuration.
+	Use:   "routepeek",
+	Short: "RoutePeek - Network topology visualization and diagnostic tool",
+	Long: `RoutePeek helps you understand your machine's network configuration.
 It shows all network interfaces, routes, DNS, VPN, and proxy settings
 in an easy-to-understand format. Great for diagnosing network issues
 like VPN affecting VM connections.`,

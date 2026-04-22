@@ -5,7 +5,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/netscope/pkg/types"
+	"github.com/routepeek/pkg/types"
 )
 
 // DetectProxy detects system proxy settings

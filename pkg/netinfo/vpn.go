@@ -4,7 +4,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/netscope/pkg/types"
+	"github.com/routepeek/pkg/types"
 )
 
 // DetectVPN detects active VPN connections

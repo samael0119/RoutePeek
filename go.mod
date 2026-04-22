@@ -1,4 +1,4 @@
-module github.com/netscope
+module github.com/routepeek
 
 go 1.21
 

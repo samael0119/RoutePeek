@@ -5,8 +5,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/netscope/pkg/netinfo"
-	"github.com/netscope/pkg/types"
+	"github.com/routepeek/pkg/netinfo"
+	"github.com/routepeek/pkg/types"
 )
 
 // RunDiagnostics runs all network diagnostics on the given snapshot

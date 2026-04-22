@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/netscope/internal/diagnostic"
-	"github.com/netscope/internal/discovery"
+	"github.com/routepeek/internal/diagnostic"
+	"github.com/routepeek/internal/discovery"
 )
 
 //go:embed static/*
@@ -39,7 +39,7 @@ func main() {
 
 	// Start server
 	addr := fmt.Sprintf(":%s", port)
-	fmt.Printf("🌐 NetScope Web Server starting on http://localhost:%s\n", port)
+	fmt.Printf("🌐 RoutePeek Web Server starting on http://localhost:%s\n", port)
 	fmt.Printf("📊 Open http://localhost:%s in your browser\n", port)
 
 	if openBrowser {

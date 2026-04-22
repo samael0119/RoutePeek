@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/netscope/internal/diagnostic"
-	"github.com/netscope/pkg/netinfo"
-	"github.com/netscope/pkg/types"
+	"github.com/routepeek/internal/diagnostic"
+	"github.com/routepeek/pkg/netinfo"
+	"github.com/routepeek/pkg/types"
 )
 
 // GetNetworkSnapshot returns a complete snapshot of network state
