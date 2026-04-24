@@ -1,6 +1,4 @@
 # Binaries
-netscope
-netscope-web
 *.exe
 *.exe~
 *.dll
@@ -25,3 +23,6 @@ Thumbs.db
 
 # Dependency directories
 vendor/
+
+routepeek
+routepeek-web
