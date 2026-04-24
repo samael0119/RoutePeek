@@ -24,6 +24,8 @@ func RunDiagnostics(snapshot *types.NetworkSnapshot) *types.DiagnosisReport {
 	diagnoseVMConnectivity(snapshot, report)
 	diagnoseProxyIssues(snapshot, report)
 	diagnoseMetricConflicts(snapshot, report)
+	diagnoseMultiNICConflict(snapshot, report)
+	diagnoseNoPublicIP(snapshot, report)
 
 	// Sort findings by severity
 	sortFindingsBySeverity(report.Findings)
@@ -192,6 +194,38 @@ func diagnoseMetricConflicts(snapshot *types.NetworkSnapshot, report *types.Diag
 				Suggestion: "检查网络配置，清理重复的路由规则。",
 			})
 		}
+	}
+}
+
+func diagnoseMultiNICConflict(snapshot *types.NetworkSnapshot, report *types.DiagnosisReport) {
+	// Count active non-loopback, non-vm interfaces
+	activeIfaces := []string{}
+	for _, iface := range snapshot.Interfaces {
+		if iface.IsUp && !iface.IsLoopback && iface.IP4 != "" &&
+			iface.Type != "vm" && iface.Type != "docker" && iface.Type != "loopback" {
+			activeIfaces = append(activeIfaces, iface.Name)
+		}
+	}
+	if len(activeIfaces) > 1 {
+		report.Findings = append(report.Findings, types.DiagnosisResult{
+			Severity:   "info",
+			Code:       "MULTI_NIC_ACTIVE",
+			Title:      "多张网卡同时活跃",
+			Message:    fmt.Sprintf("检测到 %d 张网卡同时活跃：%s。\n多网卡可能导致路由选择不确定，部分流量走错网卡。", len(activeIfaces), strings.Join(activeIfaces, "、")),
+			Suggestion: "如果不需要多网卡，可以禁用不使用的网卡，避免路由冲突。",
+		})
+	}
+}
+
+func diagnoseNoPublicIP(snapshot *types.NetworkSnapshot, report *types.DiagnosisReport) {
+	if snapshot.PublicIP == "" {
+		report.Findings = append(report.Findings, types.DiagnosisResult{
+			Severity:   "warning",
+			Code:       "NO_PUBLIC_IP",
+			Title:      "无法获取公网 IP",
+			Message:    "无法从外部服务获取你的公网 IP 地址。\n可能原因：网络未连接、防火墙阻止、或处于严格内网环境。",
+			Suggestion: "检查网络连接是否正常，尝试在浏览器中访问任意网站确认。",
+		})
 	}
 }
 
