@@ -288,11 +288,11 @@ func TraceRoute(target string) ([]types.TraceHop, error) {
 }
 
 func traceRouteLinux(target string) ([]types.TraceHop, error) {
-	// Use traceroute with numeric output (-n) and 3 probes per hop
-	cmd := exec.Command("traceroute", "-n", "-m", "30", "-q", "1", "-w", "2", target)
+	// Use traceroute with ICMP (-I) and numeric output (-n) and 3 probes per hop
+	cmd := exec.Command("traceroute", "-I", "-n", "-m", "30", "-q", "1", "-w", "2", target)
 	output, err := cmd.Output()
 	if err != nil {
-		// Fallback: try using tracepath
+		// Fallback: try using tracepath if traceroute -I fails (e.g. no root permission)
 		cmd = exec.Command("tracepath", "-m", "30", target)
 		output, err = cmd.Output()
 		if err != nil {
