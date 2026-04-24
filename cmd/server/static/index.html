@@ -1329,7 +1329,12 @@
                     .svg-line { fill: none; stroke: url(#lineGrad); stroke-width: 2; }
                     .svg-flow { fill: none; stroke: var(--cyan-bright); stroke-width: 2; stroke-dasharray: 4 12; animation: svgFlow 1s linear infinite; }
                     @keyframes svgFlow { to { stroke-dashoffset: -16; } }
-                    .svg-node-rect { fill: var(--bg-card); stroke: var(--border-mid); stroke-width: 1; rx: 8; transition: all 0.3s; }
+                    @keyframes errorPulse { 
+                        0% { stroke: var(--red); filter: drop-shadow(0 0 10px rgba(255, 58, 92, 0.5)); transform: scale(1); }
+                        50% { stroke: #ff708a; filter: drop-shadow(0 0 25px rgba(255, 58, 92, 0.8)); transform: scale(1.02); }
+                        100% { stroke: var(--red); filter: drop-shadow(0 0 10px rgba(255, 58, 92, 0.5)); transform: scale(1); }
+                    }
+                    .svg-node-rect { fill: var(--bg-card); stroke: var(--border-mid); stroke-width: 1; rx: 8; transition: all 0.3s; transform-origin: center; }
                     .svg-node:hover .svg-node-rect { stroke: var(--cyan); filter: drop-shadow(0 0 10px var(--cyan-glow)); }
                     .svg-icon { font-size: 18px; }
                     .svg-text-name { fill: var(--text-primary); font-size: 12px; font-weight: 600; font-family: 'Inter', sans-serif; }
@@ -1498,13 +1503,61 @@
 
         /* ── Diagnosis ── */
         function renderDiag(d) {
+            // First, reset any error animations on SVG nodes
+            document.querySelectorAll('.svg-node-rect').forEach(r => r.style.animation = '');
+            
             const c = document.getElementById('diagReport');
             if (!d.findings||!d.findings.length) {
                 c.innerHTML = `<div class="all-clear"><span class="check-glyph">✅</span><p>网络配置正常，未发现问题</p></div>`;
                 return;
             }
-            c.innerHTML = `<p style="margin-bottom:14px;color:var(--orange);font-weight:500;font-size:0.88rem;">📊 ${d.summary||'发现 '+d.findings.length+' 个问题'}</p>` +
-                d.findings.map(f=>`<div class="finding ${f.severity}"><div class="finding-head"><span class="finding-title">${f.title}</span><span class="finding-code">${f.code}</span></div><div class="finding-msg">${f.message.replace(/\n/g,'<br>')}</div><div class="finding-tip">${f.suggestion.replace(/\n/g,'<br>')}</div></div>`).join('');
+            
+            let html = `<p style="margin-bottom:14px;color:var(--orange);font-weight:500;font-size:0.88rem;">📊 ${d.summary||'发现 '+d.findings.length+' 个问题'}</p>`;
+            
+            d.findings.forEach(f => {
+                // Parse message into phenomenon and impact (assuming newline separated)
+                const parts = f.message.split('\n');
+                const phenomenon = parts[0];
+                const impact = parts.length > 1 ? parts.slice(1).join('<br>') : '';
+                
+                let msgHtml = `<div style="margin-bottom:4px;"><strong style="color:var(--text-primary);">现象:</strong> ${phenomenon}</div>`;
+                if (impact) {
+                    msgHtml += `<div style="margin-bottom:8px;"><strong style="color:var(--orange);">影响:</strong> ${impact}</div>`;
+                }
+                
+                html += `<div class="finding ${f.severity}">
+                    <div class="finding-head">
+                        <span class="finding-title">${f.title}</span>
+                        <span class="finding-code">${f.code}</span>
+                    </div>
+                    <div class="finding-msg">${msgHtml}</div>
+                    <div class="finding-tip"><strong style="color:var(--cyan);">建议:</strong> ${f.suggestion.replace(/\n/g,'<br>')}</div>
+                </div>`;
+                
+                // Visual linking
+                let targetId = null;
+                if (f.code.includes('DNS')) targetId = 'dns';
+                if (f.code.includes('VPN')) targetId = 'vpn';
+                if (f.code.includes('GW') || f.code.includes('METRIC')) targetId = 'gw';
+                if (f.code.includes('PROXY')) targetId = 'proxy';
+                if (f.code.includes('NO_PUBLIC_IP')) targetId = 'pub';
+                
+                if (targetId) {
+                    // Try to find the rect in SVG and make it pulse
+                    setTimeout(() => { // wait for SVG render
+                        const nodes = document.querySelectorAll('.svg-node');
+                        nodes.forEach(n => {
+                            if (n.getAttribute('onclick') && n.getAttribute('onclick').includes(`"id":"${targetId}"`)) {
+                                const rect = n.querySelector('.svg-node-rect');
+                                if (rect) {
+                                    rect.style.animation = 'errorPulse 2s infinite';
+                                }
+                            }
+                        });
+                    }, 100);
+                }
+            });
+            c.innerHTML = html;
         }
 
         /* ── Traceroute ── */
