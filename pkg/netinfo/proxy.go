@@ -17,11 +17,11 @@ func DetectProxy() *types.ProxyConfig {
 		if val := os.Getenv(env); val != "" {
 			cfg.HasProxy = true
 			envUpper := strings.ToUpper(env)
-			if envUpper == "HTTP_PROXY" || envUpper == "HTTP_PROXY" {
+			if envUpper == "HTTP_PROXY" {
 				cfg.HTTPProxy = val
-			} else if envUpper == "HTTPS_PROXY" || envUpper == "HTTPS_PROXY" {
+			} else if envUpper == "HTTPS_PROXY" {
 				cfg.HTTPSProxy = val
-			} else if envUpper == "NO_PROXY" || envUpper == "NO_PROXY" {
+			} else if envUpper == "NO_PROXY" {
 				cfg.NoProxy = val
 			}
 		}
