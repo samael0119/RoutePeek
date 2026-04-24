@@ -272,3 +272,203 @@ func GetVMSubnetRoutes(routes []types.RouteEntry) []types.RouteEntry {
 
 	return vmRoutes
 }
+
+// TraceRoute performs a traceroute to the target and returns hop information
+func TraceRoute(target string) ([]types.TraceHop, error) {
+	switch runtime.GOOS {
+	case "linux":
+		return traceRouteLinux(target)
+	case "darwin":
+		return traceRouteMac(target)
+	case "windows":
+		return traceRouteWindows(target)
+	default:
+		return nil, fmt.Errorf("unsupported platform: %s", runtime.GOOS)
+	}
+}
+
+func traceRouteLinux(target string) ([]types.TraceHop, error) {
+	// Use traceroute with numeric output (-n) and 3 probes per hop
+	cmd := exec.Command("traceroute", "-n", "-m", "30", "-q", "1", "-w", "2", target)
+	output, err := cmd.Output()
+	if err != nil {
+		// Fallback: try using tracepath
+		cmd = exec.Command("tracepath", "-m", "30", target)
+		output, err = cmd.Output()
+		if err != nil {
+			return nil, fmt.Errorf("traceroute failed: %w", err)
+		}
+	}
+
+	return parseTracerouteOutput(string(output))
+}
+
+func traceRouteMac(target string) ([]types.TraceHop, error) {
+	// Use traceroute on macOS
+	cmd := exec.Command("traceroute", "-n", "-m", "30", target)
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("traceroute failed: %w", err)
+	}
+
+	return parseTracerouteOutput(string(output))
+}
+
+func traceRouteWindows(target string) ([]types.TraceHop, error) {
+	// Use tracert on Windows
+	cmd := exec.Command("tracert", "-d", "-h", "30", "-w", "2000", target)
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("tracert failed: %w", err)
+	}
+
+	return parseWindowsTraceOutput(string(output))
+}
+
+func parseTracerouteOutput(output string) ([]types.TraceHop, error) {
+	var hops []types.TraceHop
+	scanner := bufio.NewScanner(strings.NewReader(output))
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		// Skip header lines
+		if strings.HasPrefix(line, "traceroute") || strings.HasPrefix(line, "tracepath") {
+			continue
+		}
+
+		// Parse lines like: " 1  192.168.1.1  1.234 ms  1.456 ms  1.789 ms"
+		// or: " 1  192.168.1.1  1.234 ms"
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+
+		hop := types.TraceHop{}
+
+		// First field should be hop number
+		hopNumStr := strings.Trim(fields[0], " *")
+		if n, err := strconv.Atoi(hopNumStr); err == nil {
+			hop.Hop = n
+		} else {
+			continue
+		}
+
+		// Find IP address (usually second field, may be * or hostname)
+		for i := 1; i < len(fields); i++ {
+			f := fields[i]
+			if f == "*" {
+				hop.Address = "*"
+				break
+			}
+			// Check if it looks like an IP address
+			if net.ParseIP(f) != nil {
+				hop.Address = f
+				break
+			}
+			// Could be hostname followed by IP in parens
+			if strings.Contains(f, "(") {
+				// hostname(ip)
+				if idx := strings.Index(f, "("); idx > 0 {
+					hop.Hostname = f[:idx]
+				}
+				ip := strings.Trim(strings.Trim(f, "()"), "*")
+				if net.ParseIP(ip) != nil {
+					hop.Address = ip
+				}
+				break
+			}
+		}
+
+		// Parse RTT values - combine adjacent number + unit fields
+		// e.g. ["2.677", "ms"] -> "2.677 ms"
+		for i := 1; i < len(fields)-1; i++ {
+			f := strings.TrimRight(fields[i], "\r")
+			unit := strings.TrimRight(fields[i+1], "\r")
+			// Check if current field is a number and next is "ms" or "s"
+			if _, err := strconv.ParseFloat(f, 64); err == nil {
+				if unit == "ms" || unit == "s" {
+					val := f + " " + unit
+					switch {
+					case hop.RTT1 == "":
+						hop.RTT1 = val
+					case hop.RTT2 == "":
+						hop.RTT2 = val
+					case hop.RTT3 == "":
+						hop.RTT3 = val
+					}
+				}
+			}
+		}
+
+		if hop.Hop > 0 {
+			hops = append(hops, hop)
+		}
+	}
+
+	return hops, nil
+}
+
+func parseWindowsTraceOutput(output string) ([]types.TraceHop, error) {
+	var hops []types.TraceHop
+	scanner := bufio.NewScanner(strings.NewReader(output))
+
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		// Skip header lines
+		if strings.HasPrefix(strings.TrimSpace(line), "Tracing") {
+			continue
+		}
+
+		// Parse lines like: "  1     1 ms     1 ms     1 ms  192.168.1.1"
+		// or: "  1        *        *        *     请求超时"
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+
+		hop := types.TraceHop{}
+
+		// First field is hop number
+		if n, err := strconv.Atoi(strings.Trim(fields[0], " ")); err == nil {
+			hop.Hop = n
+		} else {
+			continue
+		}
+
+		// Find IP address - usually last field
+		for i := len(fields) - 1; i >= 0; i-- {
+			f := fields[i]
+			if f == "*" || strings.Contains(f, "超时") || strings.Contains(f, "timed") {
+				hop.Address = "*"
+				continue
+			}
+			if net.ParseIP(f) != nil {
+				hop.Address = f
+				break
+			}
+		}
+
+		// Parse RTT values - fields between hop number and IP
+		for i := 1; i < len(fields); i++ {
+			f := fields[i]
+			if strings.HasSuffix(f, "ms") || strings.HasSuffix(f, "s") {
+				val := strings.Trim(strings.Trim(f, "ms"), "s")
+				switch {
+				case hop.RTT1 == "":
+					hop.RTT1 = val + " ms"
+				case hop.RTT2 == "":
+					hop.RTT2 = val + " ms"
+				case hop.RTT3 == "":
+					hop.RTT3 = val + " ms"
+				}
+			}
+		}
+
+		if hop.Hop > 0 {
+			hops = append(hops, hop)
+		}
+	}
+
+	return hops, nil
+}

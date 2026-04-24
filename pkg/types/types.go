@@ -91,3 +91,13 @@ type DiagnosisReport struct {
 	Findings  []DiagnosisResult `json:"findings"`
 	Summary   string            `json:"summary"`
 }
+
+// TraceHop represents a single hop in a traceroute
+type TraceHop struct {
+	Hop     int    `json:"hop"`
+	Address string `json:"address"`
+	RTT1    string `json:"rtt1"`
+	RTT2    string `json:"rtt2"`
+	RTT3    string `json:"rtt3"`
+	Hostname string `json:"hostname,omitempty"`
+}
