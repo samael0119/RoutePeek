@@ -12,6 +12,8 @@ var ProxyEnvVars = []string{
 var VPNInterfacePrefixes = []string{
 	"tun", "tap", "ppp", "vpnc", "vpn",
 	"wg", "utun", "ipsec",
+	"cnem", "cnem_vnic",
+	"tailscale", "nordlynx", "warp", "mullvad", "proton", "wireguard",
 }
 
 // Common VMware subnets

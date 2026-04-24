@@ -41,6 +41,31 @@ func DetectVPN() *types.VPNInfo {
 		}
 	}
 
+	// Fallback: check routes for non-default-gateway 0.0.0.0/0 routes
+	routes, _ := GetRoutes()
+	defaultGw, _ := GetDefaultGateway()
+	for _, route := range routes {
+		if route.Destination == "default" || route.Destination == "0.0.0.0/0" {
+			if route.Interface != "" && route.Gateway != defaultGw {
+				// This interface routes all traffic but isn't the default gateway - likely VPN
+				vpn.Interface = route.Interface
+				vpn.Status = "connected"
+				vpn.Name = route.Interface + " (detected)"
+				// Try to get client IP
+				if iface, err := net.InterfaceByName(route.Interface); err == nil {
+					addrs, _ := iface.Addrs()
+					for _, addr := range addrs {
+						if v, ok := addr.(*net.IPNet); ok && v.IP.To4() != nil {
+							vpn.ClientIP = v.IP.String()
+							vpn.Protocol = guessVPNProtocol(v.IP)
+						}
+					}
+				}
+				return vpn
+			}
+		}
+	}
+
 	vpn.Status = "disconnected"
 	return vpn
 }
