@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/routepeek/internal/discovery"
+	"github.com/routepeek/internal/i18n"
 	"github.com/spf13/cobra"
 )
 
@@ -15,7 +16,7 @@ var (
 
 var rootCmd = &cobra.Command{
 	Use:   "routepeek",
-	Short: "RoutePeek - Network topology visualization and diagnostic tool",
+	Short: i18n.T("cli_short"),
 	Long: `RoutePeek helps you understand your machine's network configuration.
 It shows all network interfaces, routes, DNS, VPN, and proxy settings
 in an easy-to-understand format. Great for diagnosing network issues
@@ -25,7 +26,7 @@ like VPN affecting VM connections.`,
 
 var scanCmd = &cobra.Command{
 	Use:   "scan",
-	Short: "Scan and display current network configuration",
+	Short: i18n.T("cli_scan"),
 	Run: func(cmd *cobra.Command, args []string) {
 		snapshot, err := discovery.GetNetworkSnapshot()
 		if err != nil {
@@ -43,7 +44,7 @@ var scanCmd = &cobra.Command{
 
 var diagCmd = &cobra.Command{
 	Use:   "diag",
-	Short: "Run network diagnostics",
+	Short: i18n.T("cli_diag"),
 	Run: func(cmd *cobra.Command, args []string) {
 		snapshot, err := discovery.GetNetworkSnapshot()
 		if err != nil {
@@ -63,7 +64,7 @@ var diagCmd = &cobra.Command{
 
 var routeCmd = &cobra.Command{
 	Use:   "routes",
-	Short: "Show routing table",
+	Short: i18n.T("cli_routes"),
 	Run: func(cmd *cobra.Command, args []string) {
 		routes, err := discovery.GetRoutes()
 		if err != nil {
@@ -81,7 +82,7 @@ var routeCmd = &cobra.Command{
 
 var interfacesCmd = &cobra.Command{
 	Use:   "interfaces",
-	Short: "Show all network interfaces",
+	Short: i18n.T("cli_iface"),
 	Aliases: []string{"iface", "if"},
 	Run: func(cmd *cobra.Command, args []string) {
 		interfaces, err := discovery.GetInterfaces()
@@ -102,8 +103,8 @@ func init() {
 	rootCmd.AddCommand(scanCmd, diagCmd, routeCmd, interfacesCmd)
 
 	// Global flags
-	rootCmd.PersistentFlags().BoolVar(&jsonOutput, "json", false, "Output as JSON")
-	rootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "Disable colored output")
+	rootCmd.PersistentFlags().BoolVar(&jsonOutput, "json", false, i18n.T("cli_json"))
+	rootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, i18n.T("cli_nocolor"))
 }
 
 func main() {

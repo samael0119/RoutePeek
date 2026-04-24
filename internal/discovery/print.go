@@ -7,6 +7,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/routepeek/internal/diagnostic"
+	"github.com/routepeek/internal/i18n"
 	"github.com/routepeek/pkg/types"
 )
 
@@ -21,51 +22,51 @@ func PrintJSON(data interface{}) {
 func PrintNetworkOverview(s *types.NetworkSnapshot, color bool) {
 	fmt.Println()
 	fmt.Println("╔══════════════════════════════════════════════════════════════════════╗")
-	fmt.Println("║                     RoutePeek - 网络配置总览                          ║")
+	fmt.Printf("║  %s\n", i18n.T("title_overview"))
 	fmt.Println("╚══════════════════════════════════════════════════════════════════════╝")
 	fmt.Println()
 
 	// Network Interfaces
 	fmt.Println("┌─────────────────────────────────────────────────────────────────────┐")
-	fmt.Println("│ 📡 网络接口                                                             │")
+	fmt.Printf("│ %s\n", i18n.T("title_iface"))
 	fmt.Println("└─────────────────────────────────────────────────────────────────────┘")
 	printInterfacesTable(s.Interfaces, color)
 	fmt.Println()
 
 	// Routing
 	fmt.Println("┌─────────────────────────────────────────────────────────────────────┐")
-	fmt.Println("│ 📋 路由表                                                               │")
+	fmt.Printf("│ %s\n", i18n.T("title_routes"))
 	fmt.Println("└─────────────────────────────────────────────────────────────────────┘")
 	printRoutesTable(s.Routes, color)
 	fmt.Println()
 
 	// DNS
 	fmt.Println("┌─────────────────────────────────────────────────────────────────────┐")
-	fmt.Println("│ 🔤 DNS 配置                                                             │")
+	fmt.Printf("│ %s\n", i18n.T("title_dns"))
 	fmt.Println("└─────────────────────────────────────────────────────────────────────┘")
 	if len(s.DNS.Servers) > 0 {
 		for i, dns := range s.DNS.Servers {
 			suffix := ""
 			if isWellKnownDNS(dns) {
-				suffix = " (公共 DNS)"
+				suffix = i18n.T("public_dns")
 			}
 			fmt.Printf("   %d. %s%s\n", i+1, dns, suffix)
 		}
 	} else {
-		fmt.Println("   无")
+		fmt.Printf("   %s\n", i18n.T("none"))
 	}
 	fmt.Println()
 
 	// VPN
 	if s.VPN != nil {
 		fmt.Println("┌─────────────────────────────────────────────────────────────────────┐")
-		fmt.Println("│ 🔒 VPN 状态                                                             │")
+		fmt.Printf("│ %s\n", i18n.T("title_vpn"))
 		fmt.Println("└─────────────────────────────────────────────────────────────────────┘")
-		fmt.Printf("   状态: %s\n", s.VPN.Status)
+		fmt.Printf("   %s: %s\n", i18n.T("status"), s.VPN.Status)
 		if s.VPN.Status == "connected" {
-			fmt.Printf("   接口: %s\n", s.VPN.Interface)
-			fmt.Printf("   客户端 IP: %s\n", s.VPN.ClientIP)
-			fmt.Printf("   协议: %s\n", s.VPN.Protocol)
+			fmt.Printf("   %s: %s\n", i18n.T("interface"), s.VPN.Interface)
+			fmt.Printf("   %s: %s\n", i18n.T("client_ip"), s.VPN.ClientIP)
+			fmt.Printf("   %s: %s\n", i18n.T("protocol"), s.VPN.Protocol)
 		}
 		fmt.Println()
 	}
@@ -73,7 +74,7 @@ func PrintNetworkOverview(s *types.NetworkSnapshot, color bool) {
 	// Proxy
 	if s.Proxy.HasProxy {
 		fmt.Println("┌─────────────────────────────────────────────────────────────────────┐")
-		fmt.Println("│ 🌐 代理设置                                                             │")
+		fmt.Printf("│ %s\n", i18n.T("title_proxy"))
 		fmt.Println("└─────────────────────────────────────────────────────────────────────┘")
 		if s.Proxy.HTTPProxy != "" {
 			fmt.Printf("   HTTP:  %s\n", s.Proxy.HTTPProxy)
@@ -87,11 +88,11 @@ func PrintNetworkOverview(s *types.NetworkSnapshot, color bool) {
 	// VM Networks
 	if len(s.VMNetworks) > 0 {
 		fmt.Println("┌─────────────────────────────────────────────────────────────────────┐")
-		fmt.Println("│ 🖥️  虚拟机网络                                                          │")
+		fmt.Printf("│ %s\n", i18n.T("title_vm"))
 		fmt.Println("└─────────────────────────────────────────────────────────────────────┘")
 		for _, vm := range s.VMNetworks {
 			fmt.Printf("   %s\n", vm.Name)
-			fmt.Printf("      子网: %s | 网关: %s\n", vm.Subnet, vm.Gateway)
+			fmt.Printf("      %s: %s | %s: %s\n", i18n.T("subnet"), vm.Subnet, i18n.T("gateway"), vm.Gateway)
 		}
 		fmt.Println()
 	}
@@ -99,7 +100,7 @@ func PrintNetworkOverview(s *types.NetworkSnapshot, color bool) {
 	// Public IP
 	if s.PublicIP != "" {
 		fmt.Println("┌─────────────────────────────────────────────────────────────────────┐")
-		fmt.Println("│ 🌏 公网 IP                                                              │")
+		fmt.Printf("│ %s\n", i18n.T("title_public_ip"))
 		fmt.Println("└─────────────────────────────────────────────────────────────────────┘")
 		fmt.Printf("   %s\n", s.PublicIP)
 		fmt.Println()
@@ -108,7 +109,7 @@ func PrintNetworkOverview(s *types.NetworkSnapshot, color bool) {
 
 func printInterfacesTable(ifaces []types.NetworkInterface, color bool) {
 	if len(ifaces) == 0 {
-		fmt.Println("   无")
+		fmt.Printf("   %s\n", i18n.T("none"))
 		return
 	}
 
@@ -134,12 +135,12 @@ func printInterfacesTable(ifaces []types.NetworkInterface, color bool) {
 
 func printRoutesTable(routes []types.RouteEntry, color bool) {
 	if len(routes) == 0 {
-		fmt.Println("   无")
+		fmt.Printf("   %s\n", i18n.T("none"))
 		return
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintf(w, "   %-20s %-15s %-10s %s\n", "目标网络", "网关", "接口", "Metric")
+	fmt.Fprintf(w, "   %-20s %-15s %-10s %s\n", i18n.T("dest_network"), i18n.T("gateway"), i18n.T("interface"), i18n.T("metric"))
 	fmt.Fprintf(w, "   %-20s %-15s %-10s %s\n", "────────────────────", "───────────────", "──────────", "──────")
 
 	for _, route := range routes {
