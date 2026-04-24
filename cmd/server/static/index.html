@@ -999,6 +999,15 @@
                     </div>
                 </div>
                 <svg id="topoSvg" class="topo-svg" width="100%" height="400"></svg>
+                <!-- Detail Panel -->
+                <div id="nodeDetailPanel" style="display:none; position:absolute; top:20px; right:20px; width:300px; background:var(--bg-panel); border:1px solid var(--cyan); border-radius:12px; padding:16px; backdrop-filter:blur(10px); box-shadow:0 10px 30px rgba(0,0,0,0.5), 0 0 20px rgba(0,212,255,0.2); z-index:100;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid var(--border-dim); padding-bottom:8px;">
+                        <div id="ndTitle" style="font-weight:600; color:var(--cyan); font-size:0.9rem; display:flex; align-items:center; gap:8px;"></div>
+                        <button onclick="document.getElementById('nodeDetailPanel').style.display='none'" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:1.2rem;">&times;</button>
+                    </div>
+                    <div id="ndDesc" style="font-size:0.8rem; color:var(--text-secondary); line-height:1.5; margin-bottom:12px;"></div>
+                    <div id="ndTech" style="font-size:0.7rem; color:var(--text-muted); font-family:'JetBrains Mono', monospace; background:rgba(0,0,0,0.3); padding:8px; border-radius:6px; border:1px solid var(--border-dim);"></div>
+                </div>
             </div>
 
             <!-- Stats -->
@@ -1250,56 +1259,153 @@
             return `${geo.country} ${geo.city}${isp}`;
         }
         async function renderTopo(s) {
-            const c = document.getElementById('topo');
-            const nodes = [];
-            const vpn = s.vpn && s.vpn.status === 'connected';
-            const hasProxy = s.proxy && s.proxy.has_proxy;
-
-            // Local
-            nodes.push(`<div class="topo-node"><span class="node-name">🖥️ 本机</span><span class="node-ip">localhost</span></div>`);
-
-            // LAN gateway
+            const svg = document.getElementById('topoSvg');
+            if (!svg) return;
+            
+            const w = svg.clientWidth || 800;
+            const h = 400;
+            svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+            
+            // Collect nodes by layer
+            const l1 = []; // Localhost + interfaces
+            const l2 = []; // Gateway, VPN, Proxy, DNS
+            const l3 = []; // Public IP, Internet
+            
+            // Layer 1
+            l1.push({ id: 'local', type: 'local', name: '我的电脑', ip: 'localhost', icon: '🖥️' });
+            if (s.interfaces) {
+                s.interfaces.filter(i => i.is_up && !i.is_loopback && i.ip4).slice(0, 4).forEach(i => {
+                    const exp = getIfaceExplanation(i.type);
+                    l1.push({ id: 'if_'+i.name, type: 'iface', name: i.name, ip: i.ip4, icon: exp.icon });
+                });
+            }
+            
+            // Layer 2
             if (s.default_gateway) {
                 const gwGeo = await fetchGeo(s.default_gateway);
                 const gwLoc = geoLabel(gwGeo);
-                const gwLine = gwLoc ? `<span class="geo-tag">${gwLoc}</span>` : '';
-                nodes.push(`<div class="topo-node gateway"><span class="topo-arrow">›</span><span class="node-name">⚡ 网关</span><span class="node-ip">${s.default_gateway}</span>${gwLine}</div>`);
+                l2.push({ id: 'gw', type: 'gateway', name: '网关', ip: s.default_gateway, loc: gwLoc, icon: '📡' });
             }
-
-            // VPN tunnel
-            if (vpn) {
-                const vpnClient = s.vpn.client_ip || '-';
-                const vpnIface = s.vpn.interface || '-';
-                const vpnProto = s.vpn.protocol || '-';
-                nodes.push(`<div class="topo-node vpn"><span class="topo-arrow">›</span><span class="node-name">🔒 VPN</span><span class="node-ip">${vpnClient}</span><span class="vpn-badge">${vpnIface} · ${vpnProto}</span></div>`);
+            if (s.vpn && s.vpn.status === 'connected') {
+                l2.push({ id: 'vpn', type: 'vpn', name: 'VPN', ip: s.vpn.client_ip || s.vpn.interface, icon: '🔒' });
             }
-
-            // Proxy
-            if (hasProxy) {
-                const proxyInfo = [];
-                if (s.proxy.http_proxy) proxyInfo.push(s.proxy.http_proxy.split('//')[1] || s.proxy.http_proxy);
-                if (s.proxy.https_proxy && s.proxy.https_proxy !== s.proxy.http_proxy) proxyInfo.push(s.proxy.https_proxy.split('//')[1] || s.proxy.https_proxy);
-                const proxyStr = proxyInfo.length ? proxyInfo.join(' | ') : '已启用';
-                nodes.push(`<div class="topo-node proxy"><span class="topo-arrow">›</span><span class="node-name">🌐 代理</span><span class="node-ip proxy-text">${proxyStr}</span></div>`);
+            if (s.proxy && s.proxy.has_proxy) {
+                l2.push({ id: 'proxy', type: 'proxy', name: '代理', ip: '已启用', icon: '🌐' });
             }
-
-            // DNS
             if (s.dns && s.dns.servers && s.dns.servers[0]) {
                 const dnsGeo = await fetchGeo(s.dns.servers[0]);
                 const dnsLoc = geoLabel(dnsGeo);
-                const dnsLine = dnsLoc ? `<span class="geo-tag">${dnsLoc}</span>` : '';
-                nodes.push(`<div class="topo-node dns-node"><span class="topo-arrow">›</span><span class="node-name">🔤 DNS</span><span class="node-ip">${s.dns.servers[0]}</span>${dnsLine}</div>`);
+                l2.push({ id: 'dns', type: 'dns', name: 'DNS', ip: s.dns.servers[0], loc: dnsLoc, icon: '🔤' });
             }
-
-            // Public IP
+            
+            // Layer 3
             if (s.public_ip) {
                 const pubGeo = await fetchGeo(s.public_ip);
                 const pubLoc = geoLabel(pubGeo);
-                const pubLine = pubLoc ? `<span class="geo-tag highlight">${pubLoc}</span>` : '';
-                nodes.push(`<div class="topo-node public"><span class="topo-arrow">›</span><span class="node-name">🌐 公网出口</span><span class="node-ip">${s.public_ip}</span>${pubLine}</div>`);
+                l3.push({ id: 'pub', type: 'public', name: '公网出口', ip: s.public_ip, loc: pubLoc, icon: '🌍' });
             }
+            l3.push({ id: 'internet', type: 'internet', name: '互联网', ip: 'Internet', icon: '☁️' });
+            
+            // Assign coordinates
+            const calcX = (index, total) => {
+                if (total === 1) return w / 2;
+                const spacing = Math.min(180, w / total);
+                const offset = (w - spacing * (total - 1)) / 2;
+                return offset + index * spacing;
+            };
+            
+            const nodes = [...l1, ...l2, ...l3];
+            l1.forEach((n, i) => { n.x = calcX(i, l1.length); n.y = 60; n.layer = 1; });
+            l2.forEach((n, i) => { n.x = calcX(i, l2.length); n.y = 200; n.layer = 2; });
+            l3.forEach((n, i) => { n.x = calcX(i, l3.length); n.y = 340; n.layer = 3; });
+            
+            // Build SVG elements
+            let svgHTML = `<defs>
+                <linearGradient id="lineGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="rgba(0, 212, 255, 0.1)" />
+                    <stop offset="100%" stop-color="rgba(0, 212, 255, 0.4)" />
+                </linearGradient>
+                <style>
+                    .svg-line { fill: none; stroke: url(#lineGrad); stroke-width: 2; }
+                    .svg-flow { fill: none; stroke: var(--cyan-bright); stroke-width: 2; stroke-dasharray: 4 12; animation: svgFlow 1s linear infinite; }
+                    @keyframes svgFlow { to { stroke-dashoffset: -16; } }
+                    .svg-node-rect { fill: var(--bg-card); stroke: var(--border-mid); stroke-width: 1; rx: 8; transition: all 0.3s; }
+                    .svg-node:hover .svg-node-rect { stroke: var(--cyan); filter: drop-shadow(0 0 10px var(--cyan-glow)); }
+                    .svg-icon { font-size: 18px; }
+                    .svg-text-name { fill: var(--text-primary); font-size: 12px; font-weight: 600; font-family: 'Inter', sans-serif; }
+                    .svg-text-ip { fill: var(--text-muted); font-size: 10px; font-family: 'JetBrains Mono', monospace; }
+                    .svg-text-loc { fill: var(--text-dim); font-size: 9px; font-family: 'Inter', sans-serif; }
+                </style>
+            </defs>`;
+            
+            // Draw connections L1 -> L2
+            l1.forEach(n1 => {
+                l2.forEach(n2 => {
+                    const path = `M ${n1.x} ${n1.y + 25} C ${n1.x} ${n1.y + 90}, ${n2.x} ${n2.y - 90}, ${n2.x} ${n2.y - 25}`;
+                    svgHTML += `<path class="svg-line" d="${path}" />`;
+                    svgHTML += `<path class="svg-flow" d="${path}" />`;
+                });
+            });
+            // Draw connections L2 -> L3
+            l2.forEach(n2 => {
+                l3.forEach(n3 => {
+                    const path = `M ${n2.x} ${n2.y + 25} C ${n2.x} ${n2.y + 90}, ${n3.x} ${n3.y - 90}, ${n3.x} ${n3.y - 25}`;
+                    svgHTML += `<path class="svg-line" d="${path}" />`;
+                    svgHTML += `<path class="svg-flow" d="${path}" />`;
+                });
+            });
+            
+            // Draw nodes
+            nodes.forEach(n => {
+                const nw = 130, nh = 50;
+                let strokeColor = 'var(--border-mid)';
+                if (n.type === 'gateway') strokeColor = 'rgba(255, 159, 26, 0.4)';
+                if (n.type === 'vpn') strokeColor = 'rgba(255, 58, 92, 0.4)';
+                if (n.type === 'dns') strokeColor = 'rgba(0, 255, 148, 0.4)';
+                if (n.type === 'public') strokeColor = 'rgba(180, 79, 255, 0.4)';
 
-            c.innerHTML = nodes.join('');
+                const nodeData = encodeURIComponent(JSON.stringify(n));
+                svgHTML += `
+                <g class="svg-node" transform="translate(${n.x}, ${n.y})" style="cursor:pointer;" onclick="showNodeDetail('${nodeData}')">
+                    <rect class="svg-node-rect" x="${-nw/2}" y="${-nh/2}" width="${nw}" height="${nh}" style="stroke:${strokeColor};" />
+                    <text class="svg-icon" x="${-nw/2 + 10}" y="${5}">${n.icon}</text>
+                    <text class="svg-text-name" x="${-nw/2 + 35}" y="${-5}">${n.name}</text>
+                    <text class="svg-text-ip" x="${-nw/2 + 35}" y="${12}">${n.ip}</text>
+                    ${n.loc ? `<text class="svg-text-loc" x="${-nw/2 + 35}" y="${22}">${n.loc}</text>` : ''}
+                </g>`;
+            });
+            
+            svg.innerHTML = svgHTML;
+        }
+
+        function showNodeDetail(dataStr) {
+            const n = JSON.parse(decodeURIComponent(dataStr));
+            let title = n.name;
+            let desc = '';
+            let tech = `IP: ${n.ip}`;
+            
+            if (n.type === 'iface' || n.type === 'local') {
+                const exp = n.type === 'local' ? explanations.interfaceType.loopback : getIfaceExplanation(n.id.replace('if_',''));
+                if (n.type !== 'local') {
+                    const ifaceType = (snap.interfaces||[]).find(i=>i.name===n.name)?.type || 'unknown';
+                    desc = getIfaceExplanation(ifaceType).desc;
+                } else {
+                    desc = '当前计算机的内部网络状态。';
+                }
+            } else if (explanations.networkConcepts[n.type]) {
+                const concept = explanations.networkConcepts[n.type];
+                title = concept.title;
+                desc = concept.desc;
+            } else {
+                desc = '网络节点';
+            }
+            
+            if (n.loc) tech += `<br>位置: ${n.loc}`;
+            
+            document.getElementById('ndTitle').innerHTML = `<span>${n.icon}</span> ${title}`;
+            document.getElementById('ndDesc').textContent = desc;
+            document.getElementById('ndTech').innerHTML = tech;
+            document.getElementById('nodeDetailPanel').style.display = 'block';
         }
 
         /* ── Stats ── */
