@@ -290,8 +290,9 @@
             transform: translate(-50%, -50%);
             pointer-events: none;
         }
-        @keyframes spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
-        .scan-btn.loading .spinner { display: block; }
+        @keyframes spin-abs { to { transform: translate(-50%, -50%) rotate(360deg); } }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .scan-btn.loading .spinner { display: block; animation: spin-abs 0.7s linear infinite; }
         .scan-btn.loading { cursor: wait; padding: 0 20px; height: 38px; }
 
         /* ================================================
@@ -1603,7 +1604,31 @@
             const hc = document.getElementById('traceHops');
             if (!hops||!hops.length) { hc.innerHTML='<div class="loading">未获取到路径信息</div>'; return; }
             
-            let html = `<div style="margin-bottom:12px;font-size:0.75rem;color:var(--text-muted);letter-spacing:0.05em;">跳跃点详情</div><div class="hop-list">`;
+            // Analyze the result for summary
+            const totalHops = hops.length;
+            const timeouts = hops.filter(h => h.address === '*').length;
+            const isAllTimeout = timeouts === totalHops;
+            
+            let summaryTitle = '';
+            let summaryText = '';
+            
+            if (isAllTimeout) {
+                summaryTitle = '⚠️ 追踪被防火墙拦截';
+                summaryText = '所有节点（包括目标）都没有回应探测请求。这通常是因为目标网站或中间的网络运营商设置了防火墙，屏蔽了 UDP 追踪包。<br><strong style="color:var(--text-primary)">注意：这并不代表网站无法访问。你通常依然可以在浏览器中正常打开它。</strong>';
+            } else if (hops[totalHops - 1].address === '*') {
+                summaryTitle = '🛡️ 目标隐藏了位置';
+                summaryText = `探测数据包经过了 ${totalHops} 个节点，但目标服务器拒绝响应追踪请求。这在现代安全配置中很常见。`;
+            } else {
+                summaryTitle = '✅ 成功追踪到目标';
+                summaryText = `探测数据包成功到达目标服务器，共经过 ${totalHops} 个节点（其中 ${timeouts} 个节点隐藏了信息）。`;
+            }
+
+            let html = `<div style="margin-bottom:16px; padding:14px 18px; background:rgba(0,212,255,0.05); border:1px solid rgba(0,212,255,0.15); border-radius:10px;">
+                <div style="font-weight:600; color:var(--cyan); font-size:0.85rem; margin-bottom:6px;">${summaryTitle}</div>
+                <div style="font-size:0.75rem; color:var(--text-secondary); line-height:1.5;">${summaryText}</div>
+            </div>`;
+            
+            html += `<div style="margin-bottom:12px;font-size:0.75rem;color:var(--text-muted);letter-spacing:0.05em;">跳跃点详情</div><div class="hop-list">`;
             
             hops.forEach((h, idx) => {
                 const isT = h.address === '*';
