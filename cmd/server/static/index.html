@@ -1091,6 +1091,89 @@
     <script>
         let snap = null;
 
+        const explanations = {
+            interfaceType: {
+                ethernet: { icon: '🔌', label: '有线网卡', desc: '通过网线连接到路由器或交换机' },
+                wifi:     { icon: '📶', label: '无线网卡', desc: '通过 WiFi 连接到路由器' },
+                vpn:      { icon: '🔒', label: 'VPN 隧道', desc: '加密隧道，保护你的网络流量' },
+                vm:       { icon: '🖥️', label: '虚拟机网卡', desc: '虚拟机和宿主机之间的网络桥梁' },
+                docker:   { icon: '🐳', label: 'Docker 网桥', desc: 'Docker 容器之间通信的虚拟网络' },
+                loopback: { icon: '🔄', label: '本地回环', desc: '电脑和自己通信的接口，总是 127.0.0.1' },
+                virtual:  { icon: '💻', label: '虚拟网卡', desc: '软件模拟的网络接口' },
+                unknown:  { icon: '❓', label: '未知接口', desc: '无法识别的网络接口' }
+            },
+            networkConcepts: {
+                gateway:  { title: '网关/路由器', desc: '你家或公司的网络出口，所有上网流量都经过这里' },
+                dns:      { title: '域名解析器', desc: '把网址（如 baidu.com）翻译成 IP 地址的服务器' },
+                publicIP: { title: '公网出口 IP', desc: '你在互联网上的身份，别人看到你的地址就是这个' },
+                vpn:      { title: 'VPN 隧道', desc: '在你和 VPN 服务器之间建立加密通道，保护隐私' },
+                proxy:    { title: '代理服务器', desc: '帮你转发网络请求的中间人，常用于翻墙或加速' },
+                internet: { title: '互联网', desc: '广阔的外部网络世界' }
+            }
+        };
+
+        function getIfaceExplanation(type) {
+            return explanations.interfaceType[type] || explanations.interfaceType.unknown;
+        }
+
+        function generateStatusSummary(s, d) {
+            const parts = [];
+            
+            // Primary interface
+            let primaryIface = null;
+            if (s.default_gateway && s.routes) {
+                const defRoute = s.routes.find(r => r.destination === 'default' || r.destination === '0.0.0.0/0');
+                if (defRoute) {
+                    primaryIface = (s.interfaces || []).find(i => i.name === defRoute.interface);
+                }
+            }
+            
+            if (primaryIface) {
+                const typeExp = getIfaceExplanation(primaryIface.type);
+                parts.push(`你正通过 **${typeExp.label} (${primaryIface.name})** 连接路由器上网`);
+            } else {
+                parts.push(`未检测到上网的网卡，可能无法连接互联网`);
+            }
+
+            // VPN
+            if (s.vpn && s.vpn.status === 'connected') {
+                parts.push(`🔒 流量正在通过 **VPN (${s.vpn.interface})** 加密`);
+            }
+
+            // Proxy
+            if (s.proxy && s.proxy.has_proxy) {
+                parts.push(`🌐 使用了代理转发请求`);
+            }
+
+            // Combine and update UI
+            const el = document.getElementById('statusSummary');
+            if (el) {
+                let summaryHTML = parts.join('，');
+                
+                // Add warnings if any
+                const criticalWarnings = d && d.findings ? d.findings.filter(f => f.severity === 'critical' || f.severity === 'warning') : [];
+                if (criticalWarnings.length > 0) {
+                    summaryHTML += `。<span style="color:var(--orange)">⚠️ 检测到 ${criticalWarnings.length} 个网络问题</span>`;
+                } else {
+                    summaryHTML += `。✅ 网络状态良好`;
+                }
+                
+                el.innerHTML = summaryHTML;
+                el.style.display = 'block';
+                el.style.padding = '12px 20px';
+                el.style.background = 'rgba(0, 212, 255, 0.05)';
+                el.style.border = '1px solid var(--border-dim)';
+                el.style.borderRadius = '10px';
+                el.style.marginBottom = '24px';
+                el.style.fontSize = '0.9rem';
+                el.style.color = 'var(--text-secondary)';
+                
+                // Style bold text
+                el.innerHTML = el.innerHTML.replace(/\*\*(.*?)\*\*/g, '<strong style="color:var(--cyan);font-weight:600;">$1</strong>');
+            }
+        }
+
+
         function showSection(name) {
             document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -1134,6 +1217,7 @@
         }
 
         function renderAll(snapshot, diag) {
+            generateStatusSummary(snapshot, diag);
             renderTopo(snapshot);
             renderStats(snapshot);
             renderOVIfaces(snapshot);
