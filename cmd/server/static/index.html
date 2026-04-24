@@ -1214,8 +1214,11 @@
                 updateTS();
             } catch(e) {
                 console.error(e);
-                document.getElementById('ov-ifaces').innerHTML =
-                    '<div class="trace-error">⚠️ 数据加载失败，请刷新重试</div>';
+                const errEl = document.getElementById('statusSummary');
+                if (errEl) {
+                    errEl.innerHTML = '<div class="trace-error">⚠️ 数据加载失败，请刷新重试</div>';
+                    errEl.style.display = 'block';
+                }
             }
         }
 
@@ -1232,7 +1235,6 @@
             generateStatusSummary(snapshot, diag);
             renderTopo(snapshot);
             renderStats(snapshot);
-            renderOVIfaces(snapshot);
             renderOVDNS(snapshot);
             renderIfList(snapshot);
             renderRoutes(snapshot);
@@ -1441,14 +1443,6 @@
                     <div><div class="stat-val" style="font-size:1rem;padding-top:4px;">${vpn?'已连接':'未连接'}</div><div class="stat-label">VPN</div></div>
                 </div>
             `;
-        }
-
-        /* ── OV Interfaces ── */
-        function renderOVIfaces(s) {
-            const c = document.getElementById('ov-ifaces');
-            const ifs = (s.interfaces||[]).slice(0,4);
-            if (!ifs.length) { c.innerHTML='<div class="loading">未检测到网络接口</div>'; return; }
-            c.innerHTML = ifs.map(renderIface).join('');
         }
 
         /* ── OV DNS ── */
