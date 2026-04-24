@@ -1583,27 +1583,70 @@
         function renderTrace(hops, target) {
             const tc = document.getElementById('traceTopo');
             const nodes = [`<div class="topo-node"><span class="node-name">🖥️ 本机</span><span class="node-ip">localhost</span></div>`];
-            hops.forEach(h=>{
+            
+            // Only show a few key nodes in the visual topo to avoid clutter
+            const keyHops = [];
+            if (hops.length > 0) keyHops.push(hops[0]);
+            if (hops.length > 2) keyHops.push(hops[Math.floor(hops.length/2)]);
+            if (hops.length > 1) keyHops.push(hops[hops.length-1]);
+            
+            keyHops.forEach(h => {
                 nodes.push('<span class="topo-arrow">›</span>');
-                if (h.address&&h.address!=='*') {
+                if (h.address && h.address !== '*') {
                     nodes.push(`<div class="topo-node"><span class="node-name">${h.hostname||h.address}</span><span class="node-ip">Hop ${h.hop}</span></div>`);
                 } else {
-                    nodes.push(`<div class="topo-node timeout"><span class="node-name">❌ 超时</span><span class="node-ip">Hop ${h.hop}</span></div>`);
+                    nodes.push(`<div class="topo-node timeout"><span class="node-name">❌ 节点隐藏</span><span class="node-ip">Hop ${h.hop}</span></div>`);
                 }
             });
+            
             nodes.push('<span class="topo-arrow">›</span>');
             nodes.push(`<div class="topo-node public"><span class="node-name">🎯 ${target}</span><span class="node-ip">目标</span></div>`);
             tc.innerHTML = nodes.join('');
 
             const hc = document.getElementById('traceHops');
             if (!hops||!hops.length) { hc.innerHTML='<div class="loading">未获取到路径信息</div>'; return; }
-            hc.innerHTML = `<div style="margin-bottom:12px;font-size:0.75rem;color:var(--text-muted);letter-spacing:0.05em;">跳跃点详情</div><div class="hop-list">` +
-                hops.map(h=>{
-                    const isT = h.address==='*';
-                    const addr = isT?'❌ 请求超时':(h.hostname?`<span class="hostname">${h.hostname}</span>${h.address}`:h.address);
-                    const rtt = [h.rtt1,h.rtt2,h.rtt3].filter(x=>x).join(' <span class="dim">·</span> ')||'—';
-                    return `<div class="hop-row${isT?' timeout':''}"><div class="hop-num">${h.hop}</div><div class="hop-addr">${addr}</div><div class="hop-rtt">${rtt}</div></div>`;
-                }).join('') + '</div>';
+            
+            let html = `<div style="margin-bottom:12px;font-size:0.75rem;color:var(--text-muted);letter-spacing:0.05em;">跳跃点详情</div><div class="hop-list">`;
+            
+            hops.forEach((h, idx) => {
+                const isT = h.address === '*';
+                
+                // Zone Classification
+                let zoneStr = '';
+                let zoneColor = '';
+                if (h.hop <= 2) {
+                    zoneStr = '本地/局域网';
+                    zoneColor = 'var(--cyan)';
+                } else if (idx === hops.length - 1) {
+                    zoneStr = '目标服务器';
+                    zoneColor = 'var(--purple)';
+                } else {
+                    zoneStr = '运营商网络';
+                    zoneColor = 'var(--green)';
+                }
+
+                let addrHtml = '';
+                if (isT) {
+                    const timeoutExp = h.hop <= 2 ? '路由器未响应，通常是安全的' : '中间节点隐藏了信息，不影响连接';
+                    addrHtml = `<span class="hostname" style="color:var(--text-dim);">${timeoutExp}</span>❌ 请求超时`;
+                } else {
+                    addrHtml = h.hostname ? `<span class="hostname">${h.hostname}</span>${h.address}` : h.address;
+                }
+
+                const rtt = [h.rtt1, h.rtt2, h.rtt3].filter(x => x).join(' <span class="dim">·</span> ') || '—';
+                
+                html += `<div class="hop-row${isT ? ' timeout' : ''}">
+                    <div class="hop-num" style="display:flex;flex-direction:column;align-items:center;">
+                        <span>${h.hop}</span>
+                        <span style="font-size:0.55rem;color:${zoneColor};font-family:'Inter',sans-serif;margin-top:2px;">${zoneStr.substring(0,2)}</span>
+                    </div>
+                    <div class="hop-addr">${addrHtml}</div>
+                    <div class="hop-rtt">${rtt}</div>
+                </div>`;
+            });
+            
+            html += '</div>';
+            hc.innerHTML = html;
         }
 
         function showTErr(msg) {
