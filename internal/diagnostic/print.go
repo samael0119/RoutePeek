@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/routepeek/internal/i18n"
 	"github.com/routepeek/pkg/types"
 )
 
@@ -11,15 +12,15 @@ import (
 func PrintDiagnosticReport(report *types.DiagnosisReport, color bool) {
 	fmt.Println()
 	fmt.Println("╔══════════════════════════════════════════════════════════════════════╗")
-	fmt.Println("║                       网络诊断报告                                   ║")
+	fmt.Printf("║  %s\n", i18n.T("diag_title_cli"))
 	fmt.Println("╚══════════════════════════════════════════════════════════════════════╝")
 	fmt.Println()
 
 	// Summary
-	fmt.Printf("📊 诊断结果: %s\n\n", report.Summary)
+	fmt.Printf("📊 %s: %s\n\n", i18n.T("diag_result"), report.Summary)
 
 	if len(report.Findings) == 0 {
-		fmt.Println("✅ 未发现任何网络问题")
+		fmt.Printf("✅ %s\n", i18n.T("diag_no_issues"))
 		return
 	}
 
@@ -48,7 +49,7 @@ func printFinding(finding types.DiagnosisResult, color bool) {
 	// Suggestion
 	suggestionLines := strings.Split(finding.Suggestion, "\n")
 	for _, line := range suggestionLines {
-		fmt.Printf("   💡 建议: %s\n", line)
+		fmt.Printf("   💡 %s: %s\n", i18n.T("diag_suggestion"), line)
 	}
 
 	_ = colorCode // could use for terminal color codes

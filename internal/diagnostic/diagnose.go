@@ -5,6 +5,8 @@ import (
 	"net"
 	"sort"
 	"strings"
+ 
+	"github.com/routepeek/internal/i18n"
 
 	"github.com/routepeek/pkg/netinfo"
 	"github.com/routepeek/pkg/types"
@@ -42,9 +44,9 @@ func diagnoseDefaultGateway(snapshot *types.NetworkSnapshot, report *types.Diagn
 		report.Findings = append(report.Findings, types.DiagnosisResult{
 			Severity:   "critical",
 			Code:       "NO_DEFAULT_GW",
-			Title:      "缺少默认网关",
-			Message:    "系统没有配置默认网关，可能无法访问外部网络。",
-			Suggestion: "检查网络连接，确保 DHCP 已获取或手动配置默认网关。",
+			Title:      i18n.T("diag_no_gw_title"),
+			Message:    i18n.T("diag_no_gw_msg"),
+			Suggestion: i18n.T("diag_no_gw_sug"),
 		})
 		return
 	}
@@ -54,9 +56,9 @@ func diagnoseDefaultGateway(snapshot *types.NetworkSnapshot, report *types.Diagn
 		report.Findings = append(report.Findings, types.DiagnosisResult{
 			Severity:   "critical",
 			Code:       "INVALID_GW",
-			Title:      "默认网关配置错误",
-			Message:    "默认网关地址无效。",
-			Suggestion: "重新获取网络配置或手动设置正确的网关地址。",
+			Title:      i18n.T("diag_inv_gw_title"),
+			Message:    i18n.T("diag_inv_gw_msg"),
+			Suggestion: i18n.T("diag_inv_gw_sug"),
 		})
 	}
 }
@@ -73,9 +75,9 @@ func diagnoseVPNImpact(snapshot *types.NetworkSnapshot, report *types.DiagnosisR
 				report.Findings = append(report.Findings, types.DiagnosisResult{
 					Severity:   "warning",
 					Code:       "VPN_GLOBAL_ROUTE",
-					Title:      "VPN 使用全局路由模式",
-					Message:    fmt.Sprintf("VPN (%s) 配置为路由所有流量，这可能导致以下问题：\n• 访问本地网络（如虚拟机）受限\n• 网络延迟增加\n• 部分本地服务无法访问", snapshot.VPN.Name),
-					Suggestion: "如果不需要全局 VPN，建议切换到「分离隧道」模式，仅对特定流量使用 VPN。",
+					Title:      i18n.T("diag_vpn_global_title"),
+					Message:    fmt.Sprintf(i18n.T("diag_vpn_global_msg"), snapshot.VPN.Name),
+					Suggestion: i18n.T("diag_vpn_global_sug"),
 				})
 				return
 			}
@@ -88,9 +90,9 @@ func diagnoseDNSIssues(snapshot *types.NetworkSnapshot, report *types.DiagnosisR
 		report.Findings = append(report.Findings, types.DiagnosisResult{
 			Severity:   "critical",
 			Code:       "NO_DNS",
-			Title:      "未配置 DNS 服务器",
-			Message:    "系统没有配置任何 DNS 服务器，无法解析域名。",
-			Suggestion: "在网络设置中配置 DNS 服务器，如 8.8.8.8 或 1.1.1.1。",
+			Title:      i18n.T("diag_no_dns_title"),
+			Message:    i18n.T("diag_no_dns_msg"),
+			Suggestion: i18n.T("diag_no_dns_sug"),
 		})
 		return
 	}
@@ -102,9 +104,9 @@ func diagnoseDNSIssues(snapshot *types.NetworkSnapshot, report *types.DiagnosisR
 			report.Findings = append(report.Findings, types.DiagnosisResult{
 				Severity:   "warning",
 				Code:       "SUSPICIOUS_DNS",
-				Title:      "检测到非标准 DNS 服务器",
-				Message:    fmt.Sprintf("DNS 服务器 %s 不是已知公共 DNS，可能存在 DNS 劫持风险。", dns),
-				Suggestion: "如果这不是你配置的 DNS，建议更改为公共 DNS：8.8.8.8 (Google) 或 1.1.1.1 (Cloudflare)。",
+				Title:      i18n.T("diag_susp_dns_title"),
+				Message:    fmt.Sprintf(i18n.T("diag_susp_dns_msg"), dns),
+				Suggestion: i18n.T("diag_susp_dns_sug"),
 			})
 		}
 	}
@@ -133,9 +135,9 @@ func diagnoseVMConnectivity(snapshot *types.NetworkSnapshot, report *types.Diagn
 		report.Findings = append(report.Findings, types.DiagnosisResult{
 			Severity:   "warning",
 			Code:       "VM_NO_ROUTE",
-			Title:      "虚拟机网络可能无法访问",
-			Message:    "检测到虚拟机网络适配器，但没有找到对应的路由条目。\n这可能导致宿主机无法访问虚拟机。",
-			Suggestion: "检查虚拟机网络设置为 NAT 或桥接模式，并确保路由表包含 VM 网段。",
+			Title:      i18n.T("diag_vm_route_title"),
+			Message:    i18n.T("diag_vm_route_msg"),
+			Suggestion: i18n.T("diag_vm_route_sug"),
 		})
 	}
 }
@@ -153,9 +155,9 @@ func diagnoseProxyIssues(snapshot *types.NetworkSnapshot, report *types.Diagnosi
 		report.Findings = append(report.Findings, types.DiagnosisResult{
 			Severity:   "info",
 			Code:       "PROXY_INCOMPLETE",
-			Title:      "代理配置不完整",
-			Message:    "配置了 HTTP 代理但未配置 HTTPS 代理。\n部分应用可能仍使用系统代理导致不一致。",
-			Suggestion: "如果使用代理，建议同时配置 HTTP_PROXY 和 HTTPS_PROXY 环境变量。",
+			Title:      i18n.T("diag_proxy_inc_title"),
+			Message:    i18n.T("diag_proxy_inc_msg"),
+			Suggestion: i18n.T("diag_proxy_inc_sug"),
 		})
 	}
 
@@ -163,9 +165,9 @@ func diagnoseProxyIssues(snapshot *types.NetworkSnapshot, report *types.Diagnosi
 		report.Findings = append(report.Findings, types.DiagnosisResult{
 			Severity:   "info",
 			Code:       "PROXY_HTTPS_ONLY",
-			Title:      "仅配置了 HTTPS 代理",
-			Message:    "只配置了 HTTPS 代理但没有配置 HTTP 代理。\n部分应用可能无法正确使用代理。",
-			Suggestion: "建议同时配置 HTTP_PROXY 和 HTTPS_PROXY，或使用 ALL_PROXY 统一设置。",
+			Title:      i18n.T("diag_proxy_inc_title"),
+			Message:    i18n.T("diag_proxy_inc_msg"),
+			Suggestion: i18n.T("diag_proxy_inc_sug"),
 		})
 	}
 }
@@ -189,9 +191,9 @@ func diagnoseMetricConflicts(snapshot *types.NetworkSnapshot, report *types.Diag
 			report.Findings = append(report.Findings, types.DiagnosisResult{
 				Severity:   "warning",
 				Code:       "METRIC_CONFLICT",
-				Title:      "检测到网关路由冲突",
-				Message:    fmt.Sprintf("网关 %s 有多个相同 metric 的路由，可能导致路由不稳定。", gw),
-				Suggestion: "检查网络配置，清理重复的路由规则。",
+				Title:      i18n.T("diag_gw_conflict_title"),
+				Message:    fmt.Sprintf(i18n.T("diag_gw_conflict_msg"), gw),
+				Suggestion: i18n.T("diag_gw_conflict_sug"),
 			})
 		}
 	}
@@ -210,9 +212,9 @@ func diagnoseMultiNICConflict(snapshot *types.NetworkSnapshot, report *types.Dia
 		report.Findings = append(report.Findings, types.DiagnosisResult{
 			Severity:   "info",
 			Code:       "MULTI_NIC_ACTIVE",
-			Title:      "多张网卡同时活跃",
-			Message:    fmt.Sprintf("检测到 %d 张网卡同时活跃：%s。\n多网卡可能导致路由选择不确定，部分流量走错网卡。", len(activeIfaces), strings.Join(activeIfaces, "、")),
-			Suggestion: "如果不需要多网卡，可以禁用不使用的网卡，避免路由冲突。",
+			Title:      i18n.T("diag_multi_nic_title"),
+			Message:    fmt.Sprintf(i18n.T("diag_multi_nic_msg"), len(activeIfaces), strings.Join(activeIfaces, ", ")),
+			Suggestion: i18n.T("diag_multi_nic_sug"),
 		})
 	}
 }
@@ -222,9 +224,9 @@ func diagnoseNoPublicIP(snapshot *types.NetworkSnapshot, report *types.Diagnosis
 		report.Findings = append(report.Findings, types.DiagnosisResult{
 			Severity:   "warning",
 			Code:       "NO_PUBLIC_IP",
-			Title:      "无法获取公网 IP",
-			Message:    "无法从外部服务获取你的公网 IP 地址。\n可能原因：网络未连接、防火墙阻止、或处于严格内网环境。",
-			Suggestion: "检查网络连接是否正常，尝试在浏览器中访问任意网站确认。",
+			Title:      i18n.T("diag_no_pubip_title"),
+			Message:    i18n.T("diag_no_pubip_msg"),
+			Suggestion: i18n.T("diag_no_pubip_sug"),
 		})
 	}
 }
@@ -243,7 +245,7 @@ func sortFindingsBySeverity(findings []types.DiagnosisResult) {
 
 func generateSummary(findings []types.DiagnosisResult) string {
 	if len(findings) == 0 {
-		return "✅ 网络配置正常，未发现问题。"
+		return i18n.T("diag_summary_ok")
 	}
 
 	critical := 0
@@ -263,16 +265,16 @@ func generateSummary(findings []types.DiagnosisResult) string {
 
 	parts := []string{}
 	if critical > 0 {
-		parts = append(parts, fmt.Sprintf("%d 个严重问题", critical))
+		parts = append(parts, fmt.Sprintf(i18n.T("diag_summary_crit"), critical))
 	}
 	if warning > 0 {
-		parts = append(parts, fmt.Sprintf("%d 个警告", warning))
+		parts = append(parts, fmt.Sprintf(i18n.T("diag_summary_warn"), warning))
 	}
 	if info > 0 {
-		parts = append(parts, fmt.Sprintf("%d 个提示", info))
+		parts = append(parts, fmt.Sprintf(i18n.T("diag_summary_info"), info))
 	}
 
-	return fmt.Sprintf("发现 %s，建议检查。", strings.Join(parts, "，"))
+	return fmt.Sprintf(i18n.T("diag_summary_find"), strings.Join(parts, ", "))
 }
 
 func isPrivateIP(ip string) bool {
