@@ -44,9 +44,8 @@ func main() {
 		w.Write(data)
 	})
 
-	// Serve static files - strip "static" prefix from embedded FS
-	staticHandler := http.StripPrefix("/static/", http.FileServer(http.FS(staticFiles)))
-	r.Handle("/static/", staticHandler)
+	// Serve static files from embedded FS
+	r.PathPrefix("/static/").Handler(http.FileServer(http.FS(staticFiles)))
 	// Serve index.html at root
 	r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" || r.URL.Path == "/index.html" {
