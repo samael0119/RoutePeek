@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/routepeek/internal/discovery"
-	"github.com/routepeek/internal/i18n"
+	"github.com/samael0119/RoutePeek/internal/discovery"
+	"github.com/samael0119/RoutePeek/internal/i18n"
 	"github.com/spf13/cobra"
 )
 

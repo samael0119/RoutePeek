@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/routepeek/pkg/types"
+	"github.com/samael0119/RoutePeek/pkg/types"
 )
 
 // GetRoutes returns the routing table entries

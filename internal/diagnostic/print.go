@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/routepeek/internal/i18n"
-	"github.com/routepeek/pkg/types"
+	"github.com/samael0119/RoutePeek/internal/i18n"
+	"github.com/samael0119/RoutePeek/pkg/types"
 )
 
 // PrintDiagnosticReport prints a formatted diagnostic report

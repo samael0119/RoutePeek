@@ -9,7 +9,8 @@ A cross-platform network configuration visualization tool for beginners, helping
 | Feature | Description |
 |---------|-------------|
 | Multi-Interface Detection | Simultaneously show all interfaces: Ethernet, Wi-Fi, VPN, VM networks, etc. |
-| SVG Layered Topology | Graphical representation of the full data path from local host to public network (Web UI). |
+| Dynamic SVG Topology | Automatically render layered network paths with animated flow for clear data visualization. |
+| i18n Support | Built-in English and Chinese support, auto-detected based on system environment. |
 | Plain Language Explanations | "Translated" technical terms into simple language that anyone can understand. |
 | Smart Diagnostic Linking | Diagnostic findings pulse on the topology map to highlight problem locations. |
 | VPN/Proxy Awareness | Detect global VPN, proxy configs, and their impact on LAN/VM networks. |
@@ -112,26 +113,17 @@ For advanced users to view complete technical parameters:
 RoutePeek/
 ├── cmd/
 │   ├── cli/main.go          # CLI Entry (Cobra)
-│   └── server/main.go       # Web Server Entry
+│   └── server/              # Web Server
+│       ├── main.go          # Server entry
+│       └── static/          # Web UI static assets
 ├── internal/
-│   ├── diagnostic/          # Diagnostic Engine
-│   │   ├── diagnose.go      # RunDiagnostics() logic
-│   │   └── print.go         # Diagnostic report output
-│   └── discovery/           # Network Info Aggregation
-│       ├── snapshot.go      # GetNetworkSnapshot()
-│       └── print.go         # CLI formatted output
+│   ├── diagnostic/          # Diagnostic engine
+│   ├── discovery/           # Network info aggregation
+│   └── i18n/                # Internationalization module
 ├── pkg/
 │   ├── netinfo/             # Cross-platform collection
-│   │   ├── interface.go     # Interface enumeration
-│   │   ├── route.go         # Routing table
-│   │   ├── dns.go           # DNS config
-│   │   ├── proxy.go         # Proxy detection
-│   │   ├── vpn.go           # VPN/VM networks
-│   │   └── consts.go        # Constants
 │   └── types/               # Data structures
-│       └── types.go
-├── static/
-│   └── index.html           # Web UI (Optional)
+├── docs/                    # Documentation and plans
 ├── go.mod
 └── README.md
 ```
@@ -145,12 +137,13 @@ github.com/spf13/cobra v1.8.0     # CLI Framework
 
 ## Future Plans
 
+- [x] SVG Visualization in Web UI
 - [ ] Phase 2: One-click fix (Backup + Confirmation + Rollback)
-- [ ] Improved SVG visualization in Web UI
-- [ ] Migrate Web UI to Vue/React
-- [ ] Create Makefile for cross-platform builds
+- [ ] Migrate Web UI to Vue/React (Improve responsiveness and maintainability)
+- [ ] Create Makefile for one-click cross-platform builds
 - [ ] Support DNS over HTTPS/TLS detection
-- [ ] Geolocation for traceroute hops
+- [ ] Integrate traceroute geolocation into detailed lists
+- [ ] Export diagnostic reports as PDF/Images
 
 ## Background
 

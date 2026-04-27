@@ -6,10 +6,10 @@ import (
 	"sort"
 	"strings"
  
-	"github.com/routepeek/internal/i18n"
+	"github.com/samael0119/RoutePeek/internal/i18n"
 
-	"github.com/routepeek/pkg/netinfo"
-	"github.com/routepeek/pkg/types"
+	"github.com/samael0119/RoutePeek/pkg/netinfo"
+	"github.com/samael0119/RoutePeek/pkg/types"
 )
 
 // RunDiagnostics runs all network diagnostics on the given snapshot

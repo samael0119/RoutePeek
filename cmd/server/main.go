@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/routepeek/internal/diagnostic"
-	"github.com/routepeek/internal/discovery"
-	"github.com/routepeek/pkg/netinfo"
+	"github.com/samael0119/RoutePeek/internal/diagnostic"
+	"github.com/samael0119/RoutePeek/internal/discovery"
+	"github.com/samael0119/RoutePeek/pkg/netinfo"
 )
 
 //go:embed static/*

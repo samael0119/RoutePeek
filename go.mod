@@ -1,4 +1,4 @@
-module github.com/routepeek
+module github.com/samael0119/RoutePeek
 
 go 1.21
 

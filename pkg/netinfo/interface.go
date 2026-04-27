@@ -5,7 +5,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/routepeek/pkg/types"
+	"github.com/samael0119/RoutePeek/pkg/types"
 )
 
 // GetNetworkInterfaces returns all network interfaces on the system

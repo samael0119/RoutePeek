@@ -6,9 +6,9 @@ import (
 	"os"
 	"text/tabwriter"
 
-	"github.com/routepeek/internal/diagnostic"
-	"github.com/routepeek/internal/i18n"
-	"github.com/routepeek/pkg/types"
+	"github.com/samael0119/RoutePeek/internal/diagnostic"
+	"github.com/samael0119/RoutePeek/internal/i18n"
+	"github.com/samael0119/RoutePeek/pkg/types"
 )
 
 // PrintJSON prints the given data as formatted JSON

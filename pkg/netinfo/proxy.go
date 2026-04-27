@@ -5,7 +5,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/routepeek/pkg/types"
+	"github.com/samael0119/RoutePeek/pkg/types"
 )
 
 // DetectProxy detects system proxy settings

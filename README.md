@@ -9,8 +9,9 @@
 | 功能 | 说明 |
 |------|------|
 | 多网卡检测 | 同时展示有线、WiFi、VPN、虚拟机网络等所有网卡 |
-| SVG 分层拓扑 | 图形化展示数据从本机到公网的完整路径（Web 端） |
-| 通俗解释系统 | 提供网络术语的「大白话」解释，小白也能看懂 |
+| 动态 SVG 拓扑 | 自动绘制分层网络路径，带动态流向动画，直观展示数据流向 |
+| 多语言支持 | 内置中英文支持，根据系统环境自动切换，小白无压力 |
+| 通俗解释系统 | 提供网络术语的「大白话」解释，让技术参数不再晦涩 |
 | 智能诊断联动 | 诊断结果直接在拓扑图上以脉冲高亮显示，直观定位问题 |
 | VPN/代理感知 | 检测全局VPN、代理配置及其对局域网的影响 |
 | Traceroute | `/api/trace?target=` 场景化追踪到任意目标的路径 |
@@ -112,26 +113,17 @@ go build -o RoutePeek-web ./cmd/server
 RoutePeek/
 ├── cmd/
 │   ├── cli/main.go          # CLI 入口（Cobra）
-│   └── server/main.go       # Web 服务器入口
+│   └── server/              # Web 服务器
+│       ├── main.go          # 服务器入口
+│       └── static/          # Web UI 静态资源
 ├── internal/
 │   ├── diagnostic/          # 诊断引擎
-│   │   ├── diagnose.go      # RunDiagnostics() 核心逻辑
-│   │   └── print.go         # 诊断报告格式化输出
-│   └── discovery/           # 网络信息聚合
-│       ├── snapshot.go      # GetNetworkSnapshot()
-│       └── print.go         # CLI 格式化输出
+│   ├── discovery/           # 网络信息聚合
+│   └── i18n/                # 多语言支持模块
 ├── pkg/
 │   ├── netinfo/             # 跨平台网络信息采集
-│   │   ├── interface.go     # 网卡枚举
-│   │   ├── route.go         # 路由表
-│   │   ├── dns.go           # DNS 配置
-│   │   ├── proxy.go         # 代理检测
-│   │   ├── vpn.go           # VPN/虚拟机网络
-│   │   └── consts.go        # 常量定义
-│   └── types/               # 数据结构
-│       └── types.go
-├── static/
-│   └── index.html           # Web UI（可选）
+│   └── types/               # 数据结构定义
+├── docs/                    # 项目文档与规划
 ├── go.mod
 └── README.md
 ```
@@ -145,12 +137,13 @@ github.com/spf13/cobra v1.8.0     # CLI 框架
 
 ## 后续计划
 
+- [x] Web UI 使用 SVG 可视化拓扑图
 - [ ] Phase 2: 一键修复（备份 + 确认 + 回滚）
-- [ ] Web UI 改用 SVG 可视化拓扑图
-- [ ] Web UI 迁移 Vue/React（长期可维护性）
-- [ ] 创建 Makefile 支持跨平台编译
-- [ ] 支持 DNS over HTTPS/TLS 检测（IsSecure 字段）
-- [ ] Traceroute 跳跃点地理定位
+- [ ] Web UI 迁移 Vue/React（提升复杂场景下的响应速度与可维护性）
+- [ ] 创建 Makefile 支持一键跨平台编译
+- [ ] 支持 DNS over HTTPS/TLS 检测（安全审计）
+- [ ] Traceroute 跳跃点地理定位集成到详细列表
+- [ ] 导出 PDF/图片格式的诊断报告
 
 ## 设计背景
 
