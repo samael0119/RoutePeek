@@ -1646,19 +1646,23 @@
             let tech = `IP: ${n.ip}`;
             
             if (n.type === 'iface' || n.type === 'local') {
-                const exp = n.type === 'local' ? explanations.interfaceType.loopback : getIfaceExplanation(n.id.replace('if_',''));
+                const exp = getExplanations();
+                const nodeExp = n.type === 'local' ? exp.interfaceType.loopback : getIfaceExplanation(n.id.replace('if_',''));
                 if (n.type !== 'local') {
                     const ifaceType = (snap.interfaces||[]).find(i=>i.name===n.name)?.type || 'unknown';
                     desc = getIfaceExplanation(ifaceType).desc;
                 } else {
-                    desc = '当前计算机的内部网络状态。';
+                    desc = i18n[currentLang].node_localhost_desc;
                 }
-            } else if (explanations.networkConcepts[n.type]) {
-                const concept = explanations.networkConcepts[n.type];
-                title = concept.title;
-                desc = concept.desc;
             } else {
-                desc = '网络节点';
+                const exp = getExplanations();
+                if (exp.networkConcepts[n.type]) {
+                    const concept = exp.networkConcepts[n.type];
+                    title = concept.title;
+                    desc = concept.desc;
+                } else {
+                    desc = i18n[currentLang].node_unknown;
+                }
             }
             
             if (n.loc) tech += `<br>${i18n[currentLang].node_location}: ${n.loc}`;
