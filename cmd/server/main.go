@@ -34,6 +34,15 @@ func main() {
 	r.HandleFunc("/api/interfaces", handleInterfaces).Methods("GET")
 	r.HandleFunc("/api/routes", handleRoutes).Methods("GET")
 	r.HandleFunc("/api/trace", handleTrace).Methods("GET")
+	r.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		data, err := staticFiles.ReadFile("static/favicon.png")
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "image/png")
+		w.Write(data)
+	})
 
 	// Serve static files - strip "static" prefix from embedded FS
 	staticHandler := http.StripPrefix("/static/", http.FileServer(http.FS(staticFiles)))
