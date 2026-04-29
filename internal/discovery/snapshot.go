@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/samael0119/RoutePeek/internal/diagnostic"
@@ -81,6 +82,7 @@ func RunDiagnostics(snapshot *types.NetworkSnapshot) *types.DiagnosisReport {
 
 // getPublicIP retrieves the public/external IP address
 func getPublicIP() (string, error) {
+	client := &http.Client{Timeout: 2 * time.Second}
 	services := []string{
 		"https://api.ipify.org?format=text",
 		"https://ifconfig.me/ip",
@@ -88,22 +90,25 @@ func getPublicIP() (string, error) {
 	}
 
 	for _, service := range services {
-		resp, err := http.Get(service)
+		resp, err := client.Get(service)
 		if err != nil {
 			continue
 		}
-		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
 			continue
 		}
 
 		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
 		if err != nil {
 			continue
 		}
 
-		return string(body), nil
+		if ip := strings.TrimSpace(string(body)); ip != "" {
+			return ip, nil
+		}
 	}
 
 	return "", fmt.Errorf("could not determine public IP")

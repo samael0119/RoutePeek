@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"net"
-	"os/exec"
 	"runtime"
 	"strconv"
 	"strings"
@@ -60,8 +59,7 @@ func GetDefaultInterface() (string, error) {
 
 // Linux route parsing
 func getLinuxRoutes() ([]types.RouteEntry, error) {
-	cmd := exec.Command("ip", "route", "show")
-	output, err := cmd.Output()
+	output, err := commandRunner("ip", "route", "show")
 	if err != nil {
 		return nil, fmt.Errorf("failed to run 'ip route': %w", err)
 	}
@@ -117,8 +115,7 @@ func getLinuxRoutes() ([]types.RouteEntry, error) {
 
 // macOS route parsing
 func getMacRoutes() ([]types.RouteEntry, error) {
-	cmd := exec.Command("netstat", "-rn")
-	output, err := cmd.Output()
+	output, err := commandRunner("netstat", "-rn")
 	if err != nil {
 		return nil, fmt.Errorf("failed to run 'netstat -rn': %w", err)
 	}
@@ -168,8 +165,7 @@ func getMacRoutes() ([]types.RouteEntry, error) {
 
 // Windows route parsing
 func getWindowsRoutes() ([]types.RouteEntry, error) {
-	cmd := exec.Command("route", "print", "0.0.0.0")
-	output, err := cmd.Output()
+	output, err := commandRunner("route", "print", "0.0.0.0")
 	if err != nil {
 		return nil, fmt.Errorf("failed to run 'route print': %w", err)
 	}
@@ -263,7 +259,7 @@ func GetVMSubnetRoutes(routes []types.RouteEntry) []types.RouteEntry {
 
 		for _, vmSubnet := range append(CommonVMwareSubnets, append(CommonVirtualBoxSubnets, CommonDockerSubnets...)...) {
 			_, vmNet, _ := net.ParseCIDR(vmSubnet)
-			if vmNet != nil && vmNet.IP.Equal(dstNet.IP) {
+			if vmNet != nil && (cidrContainsNetwork(vmNet, dstNet) || cidrContainsNetwork(dstNet, vmNet)) {
 				vmRoutes = append(vmRoutes, route)
 				break
 			}
@@ -288,25 +284,22 @@ func TraceRoute(target string) ([]types.TraceHop, error) {
 }
 
 func traceRouteLinux(target string) ([]types.TraceHop, error) {
-	// Use traceroute with ICMP (-I) and numeric output (-n) and 3 probes per hop
-	cmd := exec.Command("traceroute", "-I", "-n", "-m", "30", "-q", "1", "-w", "2", target)
-	output, err := cmd.Output()
-	if err != nil {
-		// Fallback: try using tracepath if traceroute -I fails (e.g. no root permission)
-		cmd = exec.Command("tracepath", "-m", "30", target)
-		output, err = cmd.Output()
-		if err != nil {
-			return nil, fmt.Errorf("traceroute failed: %w", err)
-		}
+	output, tracepathErr := commandRunner("tracepath", "-m", "30", target)
+	if tracepathErr == nil {
+		return parseTracerouteOutput(string(output))
 	}
 
-	return parseTracerouteOutput(string(output))
+	output, tracerouteErr := commandRunner("traceroute", "-n", "-m", "30", "-q", "1", "-w", "2", target)
+	if tracerouteErr == nil {
+		return parseTracerouteOutput(string(output))
+	}
+
+	return nil, fmt.Errorf("tracepath failed: %v; traceroute failed: %w", tracepathErr, tracerouteErr)
 }
 
 func traceRouteMac(target string) ([]types.TraceHop, error) {
 	// Use traceroute on macOS
-	cmd := exec.Command("traceroute", "-n", "-m", "30", target)
-	output, err := cmd.Output()
+	output, err := commandRunner("traceroute", "-n", "-m", "30", target)
 	if err != nil {
 		return nil, fmt.Errorf("traceroute failed: %w", err)
 	}
@@ -316,8 +309,7 @@ func traceRouteMac(target string) ([]types.TraceHop, error) {
 
 func traceRouteWindows(target string) ([]types.TraceHop, error) {
 	// Use tracert on Windows
-	cmd := exec.Command("tracert", "-d", "-h", "30", "-w", "2000", target)
-	output, err := cmd.Output()
+	output, err := commandRunner("tracert", "-d", "-h", "30", "-w", "2000", target)
 	if err != nil {
 		return nil, fmt.Errorf("tracert failed: %w", err)
 	}
@@ -345,11 +337,14 @@ func parseTracerouteOutput(output string) ([]types.TraceHop, error) {
 
 		hop := types.TraceHop{}
 
-		// First field should be hop number
-		hopNumStr := strings.Trim(fields[0], " *")
+		// First field should be hop number. tracepath may suffix it with ":" or "?:".
+		hopNumStr := strings.Trim(fields[0], " *?:")
 		if n, err := strconv.Atoi(hopNumStr); err == nil {
 			hop.Hop = n
 		} else {
+			continue
+		}
+		if len(fields) > 1 && strings.Contains(fields[1], "LOCALHOST") {
 			continue
 		}
 
@@ -381,10 +376,32 @@ func parseTracerouteOutput(output string) ([]types.TraceHop, error) {
 
 		// Parse RTT values - combine adjacent number + unit fields
 		// e.g. ["2.677", "ms"] -> "2.677 ms"
-		for i := 1; i < len(fields)-1; i++ {
+		for i := 1; i < len(fields); i++ {
 			f := strings.TrimRight(fields[i], "\r")
+			if strings.HasSuffix(f, "ms") || strings.HasSuffix(f, "s") {
+				unit := "ms"
+				raw := strings.TrimSuffix(f, "ms")
+				if strings.HasSuffix(f, "s") && !strings.HasSuffix(f, "ms") {
+					unit = "s"
+					raw = strings.TrimSuffix(f, "s")
+				}
+				if _, err := strconv.ParseFloat(raw, 64); err == nil {
+					val := raw + " " + unit
+					switch {
+					case hop.RTT1 == "":
+						hop.RTT1 = val
+					case hop.RTT2 == "":
+						hop.RTT2 = val
+					case hop.RTT3 == "":
+						hop.RTT3 = val
+					}
+				}
+				continue
+			}
+			if i+1 >= len(fields) {
+				continue
+			}
 			unit := strings.TrimRight(fields[i+1], "\r")
-			// Check if current field is a number and next is "ms" or "s"
 			if _, err := strconv.ParseFloat(f, 64); err == nil {
 				if unit == "ms" || unit == "s" {
 					val := f + " " + unit
@@ -406,6 +423,18 @@ func parseTracerouteOutput(output string) ([]types.TraceHop, error) {
 	}
 
 	return hops, nil
+}
+
+func cidrContainsNetwork(parent, child *net.IPNet) bool {
+	if parent == nil || child == nil {
+		return false
+	}
+	if !parent.Contains(child.IP) {
+		return false
+	}
+	onesParent, bitsParent := parent.Mask.Size()
+	onesChild, bitsChild := child.Mask.Size()
+	return bitsParent == bitsChild && onesParent <= onesChild
 }
 
 func parseWindowsTraceOutput(output string) ([]types.TraceHop, error) {

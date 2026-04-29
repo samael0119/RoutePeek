@@ -5,11 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/gorilla/mux"
 	"github.com/samael0119/RoutePeek/internal/diagnostic"
@@ -21,8 +24,9 @@ import (
 var staticFiles embed.FS
 
 var (
-	port   = "8080"
+	port        = "8080"
 	openBrowser = true
+	traceRoute  = netinfo.TraceRoute
 )
 
 func main() {
@@ -51,7 +55,7 @@ func main() {
 		if r.URL.Path == "/" || r.URL.Path == "/index.html" {
 			data, err := staticFiles.ReadFile("static/index.html")
 			if err != nil {
-				http.Error(w, "index.html not found", 404)
+				writeJSONError(w, http.StatusNotFound, "not_found", "index.html not found")
 				return
 			}
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -81,7 +85,7 @@ func main() {
 func handleSnapshot(w http.ResponseWriter, r *http.Request) {
 	snapshot, err := discovery.GetNetworkSnapshot()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeJSONError(w, http.StatusInternalServerError, "snapshot_failed", err.Error())
 		return
 	}
 
@@ -92,7 +96,7 @@ func handleSnapshot(w http.ResponseWriter, r *http.Request) {
 func handleDiagnosis(w http.ResponseWriter, r *http.Request) {
 	snapshot, err := discovery.GetNetworkSnapshot()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeJSONError(w, http.StatusInternalServerError, "diagnosis_failed", err.Error())
 		return
 	}
 
@@ -105,7 +109,7 @@ func handleDiagnosis(w http.ResponseWriter, r *http.Request) {
 func handleInterfaces(w http.ResponseWriter, r *http.Request) {
 	interfaces, err := discovery.GetInterfaces()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeJSONError(w, http.StatusInternalServerError, "interfaces_failed", err.Error())
 		return
 	}
 
@@ -116,7 +120,7 @@ func handleInterfaces(w http.ResponseWriter, r *http.Request) {
 func handleRoutes(w http.ResponseWriter, r *http.Request) {
 	routes, err := discovery.GetRoutes()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeJSONError(w, http.StatusInternalServerError, "routes_failed", err.Error())
 		return
 	}
 
@@ -127,18 +131,63 @@ func handleRoutes(w http.ResponseWriter, r *http.Request) {
 func handleTrace(w http.ResponseWriter, r *http.Request) {
 	target := r.URL.Query().Get("target")
 	if target == "" {
-		http.Error(w, `{"error":"target parameter is required"}`, http.StatusBadRequest)
+		writeJSONError(w, http.StatusBadRequest, "missing_target", "target parameter is required")
+		return
+	}
+	if !isValidTraceTarget(target) {
+		writeJSONError(w, http.StatusBadRequest, "invalid_target", "target must be an IP address or domain name")
 		return
 	}
 
-	hops, err := netinfo.TraceRoute(target)
+	hops, err := traceRoute(target)
 	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%v"}`, err.Error()), http.StatusInternalServerError)
+		writeJSONError(w, http.StatusInternalServerError, "trace_failed", err.Error())
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(hops)
+}
+
+func writeJSONError(w http.ResponseWriter, status int, code, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]map[string]string{
+		"error": {
+			"code":    code,
+			"message": message,
+		},
+	})
+}
+
+func isValidTraceTarget(target string) bool {
+	target = strings.TrimSpace(target)
+	if target == "" || len(target) > 253 {
+		return false
+	}
+	if net.ParseIP(target) != nil {
+		return true
+	}
+
+	target = strings.TrimSuffix(target, ".")
+	if target == "" {
+		return false
+	}
+	for _, label := range strings.Split(target, ".") {
+		if len(label) == 0 || len(label) > 63 {
+			return false
+		}
+		for i, r := range label {
+			valid := r <= unicode.MaxASCII && (unicode.IsLetter(r) || unicode.IsDigit(r) || r == '-')
+			if !valid {
+				return false
+			}
+			if (i == 0 || i == len(label)-1) && r == '-' {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func openBrowserFunc(url string) {

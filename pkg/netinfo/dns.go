@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"os/exec"
 	"runtime"
 	"strings"
 
@@ -28,17 +27,17 @@ func GetDNSConfig() (*types.DNSConfig, error) {
 
 // Well-known public DNS servers
 var PublicDNS = map[string]bool{
-	"8.8.8.8":            true,
-	"8.8.4.4":            true,
-	"1.1.1.1":            true,
-	"1.0.0.1":            true,
-	"9.9.9.9":            true,
-	"208.67.222.222":     true,
-	"208.67.220.220":     true,
-	"114.114.114.114":    true,
-	"114.114.115.115":    true,
-	"223.5.5.5":          true,
-	"223.6.6.6":          true,
+	"8.8.8.8":         true,
+	"8.8.4.4":         true,
+	"1.1.1.1":         true,
+	"1.0.0.1":         true,
+	"9.9.9.9":         true,
+	"208.67.222.222":  true,
+	"208.67.220.220":  true,
+	"114.114.114.114": true,
+	"114.114.115.115": true,
+	"223.5.5.5":       true,
+	"223.6.6.6":       true,
 }
 
 // IsPublicDNS checks if the DNS server is a known public DNS
@@ -95,8 +94,7 @@ func getLinuxDNS() (*types.DNSConfig, error) {
 func getMacDNS() (*types.DNSConfig, error) {
 	cfg := &types.DNSConfig{Port: 53}
 
-	cmd := exec.Command("scutil", "--dns")
-	output, err := cmd.Output()
+	output, err := commandRunner("scutil", "--dns")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get DNS config: %w", err)
 	}
@@ -121,8 +119,7 @@ func getMacDNS() (*types.DNSConfig, error) {
 func getWindowsDNS() (*types.DNSConfig, error) {
 	cfg := &types.DNSConfig{Port: 53}
 
-	cmd := exec.Command("ipconfig", "/all")
-	output, err := cmd.Output()
+	output, err := commandRunner("ipconfig", "/all")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get DNS config: %w", err)
 	}

@@ -5,7 +5,7 @@ import (
 	"net"
 	"sort"
 	"strings"
- 
+
 	"github.com/samael0119/RoutePeek/internal/i18n"
 
 	"github.com/samael0119/RoutePeek/pkg/netinfo"
@@ -121,7 +121,7 @@ func diagnoseVMConnectivity(snapshot *types.NetworkSnapshot, report *types.Diagn
 	vmRouteFound := false
 	for _, route := range snapshot.Routes {
 		for _, vm := range snapshot.VMNetworks {
-			if strings.Contains(route.Destination, extractSubnetPrefix(vm.Subnet)) {
+			if routeMatchesSubnet(route.Destination, vm.Subnet) {
 				vmRouteFound = true
 				break
 			}
@@ -173,26 +173,31 @@ func diagnoseProxyIssues(snapshot *types.NetworkSnapshot, report *types.Diagnosi
 }
 
 func diagnoseMetricConflicts(snapshot *types.NetworkSnapshot, report *types.DiagnosisReport) {
-	// Check for multiple interfaces with same metric to same destination
-	gatewayMetrics := make(map[string]map[int]bool)
-
-	for _, route := range snapshot.Routes {
-		if route.Gateway == "" {
-			continue
-		}
-		if gatewayMetrics[route.Gateway] == nil {
-			gatewayMetrics[route.Gateway] = make(map[int]bool)
-		}
-		gatewayMetrics[route.Gateway][route.Metric] = true
+	type routeMetricKey struct {
+		destination string
+		metric      int
 	}
 
-	for gw, metrics := range gatewayMetrics {
-		if len(metrics) > 1 {
+	routesByDestinationMetric := make(map[routeMetricKey]map[string]bool)
+
+	for _, route := range snapshot.Routes {
+		if route.Destination == "" || route.Interface == "" {
+			continue
+		}
+		key := routeMetricKey{destination: route.Destination, metric: route.Metric}
+		if routesByDestinationMetric[key] == nil {
+			routesByDestinationMetric[key] = make(map[string]bool)
+		}
+		routesByDestinationMetric[key][route.Interface] = true
+	}
+
+	for key, interfaces := range routesByDestinationMetric {
+		if len(interfaces) > 1 {
 			report.Findings = append(report.Findings, types.DiagnosisResult{
 				Severity:   "warning",
 				Code:       "METRIC_CONFLICT",
 				Title:      i18n.T("diag_gw_conflict_title"),
-				Message:    fmt.Sprintf(i18n.T("diag_gw_conflict_msg"), gw),
+				Message:    fmt.Sprintf(i18n.T("diag_gw_conflict_msg"), key.destination),
 				Suggestion: i18n.T("diag_gw_conflict_sug"),
 			})
 		}
@@ -298,11 +303,23 @@ func isPrivateIP(ip string) bool {
 	return false
 }
 
-func extractSubnetPrefix(subnet string) string {
-	// Extract first two octets for matching
-	parts := strings.Split(subnet, ".")
-	if len(parts) >= 2 {
-		return parts[0] + "." + parts[1]
+func routeMatchesSubnet(routeDestination, vmSubnet string) bool {
+	_, routeNet, routeErr := net.ParseCIDR(routeDestination)
+	_, vmNet, vmErr := net.ParseCIDR(vmSubnet)
+	if routeErr != nil || vmErr != nil || routeNet == nil || vmNet == nil {
+		return false
 	}
-	return subnet
+	return networkContains(routeNet, vmNet) || networkContains(vmNet, routeNet)
+}
+
+func networkContains(parent, child *net.IPNet) bool {
+	if parent == nil || child == nil {
+		return false
+	}
+	if !parent.Contains(child.IP) {
+		return false
+	}
+	parentOnes, parentBits := parent.Mask.Size()
+	childOnes, childBits := child.Mask.Size()
+	return parentBits == childBits && parentOnes <= childOnes
 }

@@ -1322,6 +1322,33 @@
 
         let currentLang = localStorage.getItem('routepeek_lang') || 'zh';
 
+        function escapeHTML(value) {
+            return String(value ?? '').replace(/[&<>"']/g, ch => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            }[ch]));
+        }
+
+        function renderBoldMarkup(value) {
+            return escapeHTML(value).replace(/\*\*(.*?)\*\*/g, '<strong style="color:var(--cyan);font-weight:600;">$1</strong>');
+        }
+
+        async function apiFetchJSON(url) {
+            const response = await fetch(url);
+            let payload = null;
+            try {
+                payload = await response.json();
+            } catch(e) {}
+            if (!response.ok) {
+                const message = payload && payload.error && payload.error.message ? payload.error.message : response.statusText;
+                throw new Error(message || 'Request failed');
+            }
+            return payload;
+        }
+
         function setLanguage(lang) {
             currentLang = lang;
             localStorage.setItem('routepeek_lang', lang);
@@ -1430,7 +1457,7 @@
                     summaryHTML += i18n[currentLang].status_all_good;
                 }
                 
-                el.innerHTML = summaryHTML;
+                el.innerHTML = renderBoldMarkup(summaryHTML);
                 el.style.display = 'block';
                 el.style.padding = '12px 20px';
                 el.style.background = 'rgba(0, 212, 255, 0.05)';
@@ -1439,9 +1466,6 @@
                 el.style.marginBottom = '24px';
                 el.style.fontSize = '0.9rem';
                 el.style.color = 'var(--text-secondary)';
-                
-                // Style bold text
-                el.innerHTML = el.innerHTML.replace(/\*\*(.*?)\*\*/g, '<strong style="color:var(--cyan);font-weight:600;">$1</strong>');
             }
         }
 
@@ -1466,8 +1490,8 @@
         async function refreshData() {
             try {
                 const [s, d] = await Promise.all([
-                    fetch('/api/snapshot').then(r => r.json()),
-                    fetch('/api/diagnosis').then(r => r.json())
+                    apiFetchJSON('/api/snapshot'),
+                    apiFetchJSON('/api/diagnosis')
                 ]);
                 snap = s;
                 renderAll(s, d);
@@ -1476,7 +1500,7 @@
                 console.error(e);
                 const errEl = document.getElementById('statusSummary');
                 if (errEl) {
-                    errEl.innerHTML = `<div class="trace-error">${i18n[currentLang].data_load_failed}</div>`;
+                    errEl.innerHTML = `<div class="trace-error">${escapeHTML(i18n[currentLang].data_load_failed)}: ${escapeHTML(e.message)}</div>`;
                     errEl.style.display = 'block';
                 }
             }
@@ -1638,10 +1662,10 @@
                 svgHTML += `
                 <g class="svg-node" transform="translate(${n.x}, ${n.y})" style="cursor:pointer;" onclick="showNodeDetail('${nodeData}')">
                     <rect class="svg-node-rect" x="${-nw/2}" y="${-nh/2}" width="${nw}" height="${nh}" style="stroke:${strokeColor};" />
-                    <text class="svg-icon" x="${-nw/2 + 10}" y="${5}">${n.icon}</text>
-                    <text class="svg-text-name" x="${-nw/2 + 35}" y="${-5}">${n.name}</text>
-                    <text class="svg-text-ip" x="${-nw/2 + 35}" y="${12}">${n.ip}</text>
-                    ${n.loc ? `<text class="svg-text-loc" x="${-nw/2 + 35}" y="${22}">${n.loc}</text>` : ''}
+                    <text class="svg-icon" x="${-nw/2 + 10}" y="${5}">${escapeHTML(n.icon)}</text>
+                    <text class="svg-text-name" x="${-nw/2 + 35}" y="${-5}">${escapeHTML(n.name)}</text>
+                    <text class="svg-text-ip" x="${-nw/2 + 35}" y="${12}">${escapeHTML(n.ip)}</text>
+                    ${n.loc ? `<text class="svg-text-loc" x="${-nw/2 + 35}" y="${22}">${escapeHTML(n.loc)}</text>` : ''}
                 </g>`;
             });
             
@@ -1652,7 +1676,7 @@
             const n = JSON.parse(decodeURIComponent(dataStr));
             let title = n.name;
             let desc = '';
-            let tech = `IP: ${n.ip}`;
+            let tech = `IP: ${escapeHTML(n.ip)}`;
             
             if (n.type === 'iface' || n.type === 'local') {
                 const exp = getExplanations();
@@ -1674,9 +1698,9 @@
                 }
             }
             
-            if (n.loc) tech += `<br>${i18n[currentLang].node_location}: ${n.loc}`;
+            if (n.loc) tech += `<br>${escapeHTML(i18n[currentLang].node_location)}: ${escapeHTML(n.loc)}`;
             
-            document.getElementById('ndTitle').innerHTML = `<span>${n.icon}</span> ${title}`;
+            document.getElementById('ndTitle').innerHTML = `<span>${escapeHTML(n.icon)}</span> ${escapeHTML(title)}`;
             document.getElementById('ndDesc').textContent = desc;
             document.getElementById('ndTech').innerHTML = tech;
             document.getElementById('nodeDetailPanel').style.display = 'block';
@@ -1714,7 +1738,7 @@
             const c = document.getElementById('ov-dns');
             const dns = s.dns&&s.dns.servers?s.dns.servers:[];
             if (!dns.length) { c.innerHTML=`<div class="loading">${i18n[currentLang].dns_loading}</div>`; return; }
-            c.innerHTML = '<div class="dns-grid">' + dns.map(d=>`<div class="dns-item"><span class="dns-dot"></span>${d}</div>`).join('') + '</div>';
+            c.innerHTML = '<div class="dns-grid">' + dns.map(d=>`<div class="dns-item"><span class="dns-dot"></span>${escapeHTML(d)}</div>`).join('') + '</div>';
         }
 
         /* ── Full Interface List ── */
@@ -1735,17 +1759,17 @@
                 <div class="iface-item ${cls}">
                     <div class="iface-left">
                         <div class="iface-name">
-                            ${iface.name}
+                            ${escapeHTML(iface.name)}
                             <span class="status-pill ${stCls}"><span class="dot"></span>${stTxt}</span>
                         </div>
                         <div class="iface-meta">
-                            ${iface.ip4?`<span>🌐 ${iface.ip4}</span>`:''}
-                            ${iface.mac?`<span>📍 ${iface.mac}</span>`:''}
-                            ${iface.mtu?`<span>⚙️ MTU ${iface.mtu}</span>`:''}
+                            ${iface.ip4?`<span>🌐 ${escapeHTML(iface.ip4)}</span>`:''}
+                            ${iface.mac?`<span>📍 ${escapeHTML(iface.mac)}</span>`:''}
+                            ${iface.mtu?`<span>⚙️ MTU ${escapeHTML(iface.mtu)}</span>`:''}
                         </div>
                     </div>
                     <div class="iface-right">
-                        <span class="iface-badge">${iface.type||'ethernet'}</span>
+                        <span class="iface-badge">${escapeHTML(iface.type||'ethernet')}</span>
                     </div>
                 </div>
             `;
@@ -1758,7 +1782,7 @@
             document.getElementById('rtCount').textContent = rts.length + (currentLang === 'zh' ? ' 条路由' : ' routes');
             if (!rts.length) { c.innerHTML=`<div class="loading">${i18n[currentLang].rt_loading}</div>`; return; }
             c.innerHTML = `<div class="table-wrap"><table class="route-table"><thead><tr><th>${i18n[currentLang].rt_dest}</th><th>${i18n[currentLang].rt_gateway}</th><th>${i18n[currentLang].rt_interface}</th><th>${i18n[currentLang].rt_metric}</th></tr></thead><tbody>${
-                rts.map(r=>`<tr><td class="dest">${r.destination}</td><td class="gw">${r.gateway||'—'}</td><td>${r.interface}</td><td>${r.metric||'—'}</td></tr>`).join('')
+                rts.map(r=>`<tr><td class="dest">${escapeHTML(r.destination)}</td><td class="gw">${escapeHTML(r.gateway||'—')}</td><td>${escapeHTML(r.interface)}</td><td>${escapeHTML(r.metric||'—')}</td></tr>`).join('')
             }</tbody></table></div>`;
         }
 
@@ -1773,26 +1797,27 @@
                 return;
             }
             
-            let html = `<p style="margin-bottom:14px;color:var(--orange);font-weight:500;font-size:0.88rem;">📊 ${d.summary||'发现 '+d.findings.length+' 个问题'}</p>`;
+            let html = `<p style="margin-bottom:14px;color:var(--orange);font-weight:500;font-size:0.88rem;">📊 ${escapeHTML(d.summary||'发现 '+d.findings.length+' 个问题')}</p>`;
             
             d.findings.forEach(f => {
                 // Parse message into phenomenon and impact (assuming newline separated)
-                const parts = f.message.split('\n');
-                const phenomenon = parts[0];
-                const impact = parts.length > 1 ? parts.slice(1).join('<br>') : '';
+                const parts = String(f.message || '').split('\n');
+                const phenomenon = escapeHTML(parts[0]);
+                const impact = parts.length > 1 ? parts.slice(1).map(escapeHTML).join('<br>') : '';
+                const severity = ['critical', 'warning', 'info'].includes(f.severity) ? f.severity : 'info';
                 
                 let msgHtml = `<div style="margin-bottom:4px;"><strong style="color:var(--text-primary);">${i18n[currentLang].diag_phenomenon}:</strong> ${phenomenon}</div>`;
                 if (impact) {
                     msgHtml += `<div style="margin-bottom:8px;"><strong style="color:var(--orange);">${i18n[currentLang].diag_impact}:</strong> ${impact}</div>`;
                 }
                 
-                html += `<div class="finding ${f.severity}">
+                html += `<div class="finding ${severity}">
                     <div class="finding-head">
-                        <span class="finding-title">${f.title}</span>
-                        <span class="finding-code">${f.code}</span>
+                        <span class="finding-title">${escapeHTML(f.title)}</span>
+                        <span class="finding-code">${escapeHTML(f.code)}</span>
                     </div>
                     <div class="finding-msg">${msgHtml}</div>
-                    <div class="finding-tip"><strong style="color:var(--cyan);">${i18n[currentLang].diag_suggestion}:</strong> ${f.suggestion.replace(/\n/g,'<br>')}</div>
+                    <div class="finding-tip"><strong style="color:var(--cyan);">${i18n[currentLang].diag_suggestion}:</strong> ${escapeHTML(f.suggestion).replace(/\n/g,'<br>')}</div>
                 </div>`;
                 
                 // Visual linking
@@ -1828,8 +1853,7 @@
             document.getElementById('traceLoading').style.display = 'block';
             document.getElementById('traceResult').style.display = 'none';
             document.getElementById('traceError').style.display = 'none';
-            fetch('/api/trace?target='+encodeURIComponent(t))
-                .then(r=>r.json())
+            apiFetchJSON('/api/trace?target='+encodeURIComponent(t))
                 .then(hops=>{
                     document.getElementById('traceLoading').style.display = 'none';
                     document.getElementById('traceResult').style.display = 'block';
@@ -1842,8 +1866,9 @@
         }
 
         function renderTrace(hops, target) {
+            hops = Array.isArray(hops) ? hops : [];
             const tc = document.getElementById('traceTopo');
-            const nodes = [`<div class="topo-node"><span class="node-name">🖥️ ${i18n[currentLang].node_localhost}</span><span class="node-ip">localhost</span></div>`];
+            const nodes = [`<div class="topo-node"><span class="node-name">🖥️ ${escapeHTML(i18n[currentLang].node_localhost)}</span><span class="node-ip">localhost</span></div>`];
             
             // Only show a few key nodes in the visual topo to avoid clutter
             const keyHops = [];
@@ -1854,14 +1879,14 @@
             keyHops.forEach(h => {
                 nodes.push('<span class="topo-arrow">›</span>');
                 if (h.address && h.address !== '*') {
-                    nodes.push(`<div class="topo-node"><span class="node-name">${h.hostname||h.address}</span><span class="node-ip">${i18n[currentLang].trace_hop} ${h.hop}</span></div>`);
+                    nodes.push(`<div class="topo-node"><span class="node-name">${escapeHTML(h.hostname||h.address)}</span><span class="node-ip">${escapeHTML(i18n[currentLang].trace_hop)} ${escapeHTML(h.hop)}</span></div>`);
                 } else {
-                    nodes.push(`<div class="topo-node timeout"><span class="node-name">❌ ${i18n[currentLang].node_unknown}</span><span class="node-ip">${i18n[currentLang].trace_hop} ${h.hop}</span></div>`);
+                    nodes.push(`<div class="topo-node timeout"><span class="node-name">❌ ${escapeHTML(i18n[currentLang].node_unknown)}</span><span class="node-ip">${escapeHTML(i18n[currentLang].trace_hop)} ${escapeHTML(h.hop)}</span></div>`);
                 }
             });
             
             nodes.push('<span class="topo-arrow">›</span>');
-            nodes.push(`<div class="topo-node public"><span class="node-name">🎯 ${target}</span><span class="node-ip">${i18n[currentLang].trace_target}</span></div>`);
+            nodes.push(`<div class="topo-node public"><span class="node-name">🎯 ${escapeHTML(target)}</span><span class="node-ip">${escapeHTML(i18n[currentLang].trace_target)}</span></div>`);
             tc.innerHTML = nodes.join('');
 
             const hc = document.getElementById('traceHops');
@@ -1913,17 +1938,17 @@
                 let addrHtml = '';
                 if (isT) {
                     const timeoutExp = h.hop <= 2 ? i18n[currentLang].timeout_local : i18n[currentLang].timeout_isp;
-                    addrHtml = `<span class="hostname" style="color:var(--text-dim);">${timeoutExp}</span>${i18n[currentLang].trace_timeout}`;
+                    addrHtml = `<span class="hostname" style="color:var(--text-dim);">${escapeHTML(timeoutExp)}</span>${escapeHTML(i18n[currentLang].trace_timeout)}`;
                 } else {
-                    addrHtml = h.hostname ? `<span class="hostname">${h.hostname}</span>${h.address}` : h.address;
+                    addrHtml = h.hostname ? `<span class="hostname">${escapeHTML(h.hostname)}</span>${escapeHTML(h.address)}` : escapeHTML(h.address);
                 }
 
-                const rtt = [h.rtt1, h.rtt2, h.rtt3].filter(x => x).join(' <span class="dim">·</span> ') || '—';
+                const rtt = [h.rtt1, h.rtt2, h.rtt3].filter(x => x).map(escapeHTML).join(' <span class="dim">·</span> ') || '—';
                 
                 html += `<div class="hop-row${isT ? ' timeout' : ''}">
                     <div class="hop-num" style="display:flex;flex-direction:column;align-items:center;">
-                        <span>${h.hop}</span>
-                        <span style="font-size:0.55rem;color:${zoneColor};font-family:'Inter',sans-serif;margin-top:2px;">${zoneStr.substring(0,2)}</span>
+                        <span>${escapeHTML(h.hop)}</span>
+                        <span style="font-size:0.55rem;color:${zoneColor};font-family:'Inter',sans-serif;margin-top:2px;">${escapeHTML(zoneStr.substring(0,2))}</span>
                     </div>
                     <div class="hop-addr">${addrHtml}</div>
                     <div class="hop-rtt">${rtt}</div>
@@ -1936,7 +1961,7 @@
 
         function showTErr(msg) {
             const e = document.getElementById('traceError');
-            e.innerHTML = '<p>⚠️ '+msg+'</p>';
+            e.innerHTML = '<p>⚠️ '+escapeHTML(msg)+'</p>';
             e.style.display = 'block';
             document.getElementById('traceResult').style.display = 'none';
         }
