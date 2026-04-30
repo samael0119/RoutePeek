@@ -16,9 +16,11 @@ import (
 	"unicode"
 
 	"github.com/gorilla/mux"
+	"github.com/samael0119/RoutePeek/internal/connectivity"
 	"github.com/samael0119/RoutePeek/internal/diagnostic"
 	"github.com/samael0119/RoutePeek/internal/discovery"
 	"github.com/samael0119/RoutePeek/internal/overview"
+	"github.com/samael0119/RoutePeek/internal/report"
 	"github.com/samael0119/RoutePeek/pkg/netinfo"
 	"github.com/samael0119/RoutePeek/pkg/types"
 )
@@ -32,6 +34,8 @@ var (
 	traceRoute         = netinfo.TraceRoute
 	getNetworkSnapshot = discovery.GetNetworkSnapshot
 	lookupIPLocation   = fetchIPLocation
+	checkConnectivity  = connectivity.Check
+	buildReport        = report.BuildFromSnapshot
 )
 
 func main() {
@@ -41,6 +45,8 @@ func main() {
 	r.HandleFunc("/api/snapshot", handleSnapshot).Methods("GET")
 	r.HandleFunc("/api/diagnosis", handleDiagnosis).Methods("GET")
 	r.HandleFunc("/api/overview", handleOverview).Methods("GET")
+	r.HandleFunc("/api/connectivity", handleConnectivity).Methods("GET")
+	r.HandleFunc("/api/report", handleReport).Methods("GET")
 	r.HandleFunc("/api/interfaces", handleInterfaces).Methods("GET")
 	r.HandleFunc("/api/routes", handleRoutes).Methods("GET")
 	r.HandleFunc("/api/trace", handleTrace).Methods("GET")
@@ -126,6 +132,47 @@ func handleOverview(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
+}
+
+func handleConnectivity(w http.ResponseWriter, r *http.Request) {
+	snapshot, err := getNetworkSnapshot()
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "connectivity_failed", err.Error())
+		return
+	}
+
+	response := checkConnectivity(r.Context(), snapshot, nil, r.URL.Query().Get("lang"))
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+func handleReport(w http.ResponseWriter, r *http.Request) {
+	format := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("format")))
+	if format == "" {
+		format = "markdown"
+	}
+	if format != "markdown" && format != "json" {
+		writeJSONError(w, http.StatusBadRequest, "invalid_format", "format must be markdown or json")
+		return
+	}
+
+	snapshot, err := getNetworkSnapshot()
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "report_failed", err.Error())
+		return
+	}
+
+	lang := r.URL.Query().Get("lang")
+	payload := buildReport(r.Context(), snapshot, lang)
+	if format == "json" {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(payload)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+	_, _ = w.Write([]byte(report.Markdown(payload, lang)))
 }
 
 func handleInterfaces(w http.ResponseWriter, r *http.Request) {

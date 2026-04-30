@@ -110,6 +110,53 @@ type IPLocation struct {
 	Org     string `json:"org"`
 }
 
+// ConnectivityTarget describes one destination in the connectivity matrix.
+type ConnectivityTarget struct {
+	Name    string `json:"name"`
+	Address string `json:"address"`
+	Kind    string `json:"kind"`
+}
+
+// ConnectivityProbeResult is the normalized result of a lightweight probe.
+type ConnectivityProbeResult struct {
+	Status    string `json:"status"`
+	Code      string `json:"code,omitempty"`
+	Detail    string `json:"detail"`
+	Endpoint  string `json:"endpoint,omitempty"`
+	LatencyMS int64  `json:"latency_ms,omitempty"`
+}
+
+// ConnectivityTargetResult contains all probe results for one target.
+type ConnectivityTargetResult struct {
+	Target     ConnectivityTarget      `json:"target"`
+	DNS        ConnectivityProbeResult `json:"dns"`
+	TCP        ConnectivityProbeResult `json:"tcp"`
+	HTTP       ConnectivityProbeResult `json:"http"`
+	Path       ConnectivityProbeResult `json:"path"`
+	Severity   string                  `json:"severity"`
+	Conclusion string                  `json:"conclusion"`
+}
+
+// ConnectivityReport is the complete connectivity matrix.
+type ConnectivityReport struct {
+	Timestamp  time.Time                  `json:"timestamp"`
+	DurationMS int64                      `json:"duration_ms"`
+	Summary    string                     `json:"summary"`
+	Targets    []ConnectivityTargetResult `json:"targets"`
+}
+
+// TroubleshootingReport is the shareable remote troubleshooting package.
+type TroubleshootingReport struct {
+	Timestamp    time.Time           `json:"timestamp"`
+	Version      string              `json:"version"`
+	Snapshot     *NetworkSnapshot    `json:"snapshot"`
+	Diagnosis    *DiagnosisReport    `json:"diagnosis"`
+	Overview     *OverviewResponse   `json:"overview"`
+	Connectivity *ConnectivityReport `json:"connectivity"`
+	Redaction    string              `json:"redaction"`
+	Warnings     []string            `json:"warnings"`
+}
+
 // OverviewResponse is the frontend-oriented aggregate for the web UI.
 type OverviewResponse struct {
 	Snapshot  *NetworkSnapshot `json:"snapshot"`

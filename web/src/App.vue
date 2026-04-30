@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import ActionCards from './components/ActionCards.vue';
+import ConnectivityMatrix from './components/ConnectivityMatrix.vue';
 import ExplanationDrawer from './components/ExplanationDrawer.vue';
 import HealthSummary from './components/HealthSummary.vue';
 import NetworkDetails from './components/NetworkDetails.vue';
@@ -77,6 +78,8 @@ function openTopic(topic: string) {
           :loading="overview.loading.value"
         />
         <section v-else class="loading-panel">{{ i18n.t('overviewLoading') }}</section>
+
+        <ConnectivityMatrix />
 
         <div class="overview-grid">
           <ActionCards :primary="firstAction" :secondary="secondaryActions" />

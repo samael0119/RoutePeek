@@ -126,6 +126,37 @@ export interface OverviewResponse {
   topology: NetworkTopology;
 }
 
+export interface ConnectivityTarget {
+  name: string;
+  address: string;
+  kind: string;
+}
+
+export interface ConnectivityProbeResult {
+  status: 'ok' | 'warning' | 'danger' | 'info' | string;
+  code?: string;
+  detail: string;
+  endpoint?: string;
+  latency_ms?: number;
+}
+
+export interface ConnectivityTargetResult {
+  target: ConnectivityTarget;
+  dns: ConnectivityProbeResult;
+  tcp: ConnectivityProbeResult;
+  http: ConnectivityProbeResult;
+  path: ConnectivityProbeResult;
+  severity: 'ok' | 'warning' | 'danger' | 'info' | string;
+  conclusion: string;
+}
+
+export interface ConnectivityReport {
+  timestamp: string;
+  duration_ms: number;
+  summary: string;
+  targets: ConnectivityTargetResult[];
+}
+
 export interface TraceHop {
   hop: number;
   address: string;

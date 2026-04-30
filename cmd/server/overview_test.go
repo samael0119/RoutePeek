@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -98,5 +100,90 @@ func TestHandleOverviewUsesRequestedLanguage(t *testing.T) {
 	}
 	if payload.Diagnosis.Findings[0].Title != "No DNS Servers Configured" {
 		t.Fatalf("expected English diagnostic title, got %#v", payload.Diagnosis.Findings[0])
+	}
+}
+
+func TestHandleConnectivityReturnsMatrix(t *testing.T) {
+	orig := getNetworkSnapshot
+	origCheck := checkConnectivity
+	t.Cleanup(func() {
+		getNetworkSnapshot = orig
+		checkConnectivity = origCheck
+	})
+	getNetworkSnapshot = func() (*types.NetworkSnapshot, error) {
+		return &types.NetworkSnapshot{
+			Timestamp:      time.Unix(1700000000, 0),
+			DefaultGateway: "192.168.1.1",
+			DNS:            types.DNSConfig{Servers: []string{"1.1.1.1"}},
+		}, nil
+	}
+	checkConnectivity = func(context.Context, *types.NetworkSnapshot, []string, string) *types.ConnectivityReport {
+		return &types.ConnectivityReport{
+			Timestamp: time.Unix(1700000001, 0),
+			Summary:   "ok",
+			Targets: []types.ConnectivityTargetResult{{
+				Target:     types.ConnectivityTarget{Name: "google.com", Address: "google.com"},
+				Conclusion: "normal",
+			}},
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/connectivity?lang=en", nil)
+	rr := httptest.NewRecorder()
+
+	handleConnectivity(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d with body %q", http.StatusOK, rr.Code, rr.Body.String())
+	}
+	var payload types.ConnectivityReport
+	if err := json.Unmarshal(rr.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("expected connectivity JSON, got error %v and body %q", err, rr.Body.String())
+	}
+	if len(payload.Targets) == 0 || payload.Summary == "" {
+		t.Fatalf("expected connectivity targets and summary, got %#v", payload)
+	}
+}
+
+func TestHandleReportReturnsMarkdown(t *testing.T) {
+	orig := getNetworkSnapshot
+	origBuildReport := buildReport
+	t.Cleanup(func() {
+		getNetworkSnapshot = orig
+		buildReport = origBuildReport
+	})
+	getNetworkSnapshot = func() (*types.NetworkSnapshot, error) {
+		return &types.NetworkSnapshot{
+			Timestamp:      time.Unix(1700000000, 0),
+			DefaultGateway: "192.168.1.1",
+			DNS:            types.DNSConfig{Servers: []string{"1.1.1.1"}},
+			PublicIP:       "203.0.113.10",
+		}, nil
+	}
+	buildReport = func(context.Context, *types.NetworkSnapshot, string) *types.TroubleshootingReport {
+		return &types.TroubleshootingReport{
+			Timestamp:    time.Unix(1700000001, 0),
+			Version:      "0.2.0",
+			Redaction:    "redacted",
+			Warnings:     []string{"review"},
+			Overview:     &types.OverviewResponse{Health: types.HealthOverview{Label: "Healthy", Summary: "No issue"}},
+			Snapshot:     &types.NetworkSnapshot{},
+			Connectivity: &types.ConnectivityReport{Summary: "ok"},
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/report?format=markdown&lang=en", nil)
+	rr := httptest.NewRecorder()
+
+	handleReport(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d with body %q", http.StatusOK, rr.Code, rr.Body.String())
+	}
+	if got := rr.Header().Get("Content-Type"); got != "text/markdown; charset=utf-8" {
+		t.Fatalf("expected markdown content type, got %q", got)
+	}
+	if body := rr.Body.String(); !strings.Contains(body, "# RoutePeek Troubleshooting Package") {
+		t.Fatalf("unexpected markdown body %q", body)
 	}
 }

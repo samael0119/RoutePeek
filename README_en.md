@@ -15,6 +15,8 @@ A cross-platform network configuration visualization tool for beginners, helping
 | Smart Diagnostic Linking | Diagnostic findings pulse on the topology map to highlight problem locations. |
 | VPN/Proxy Awareness | Detect global VPN, proxy configs, and their impact on LAN/VM networks. |
 | Traceroute | `/api/trace?target=` Scenario-based path tracing to any target. |
+| Connectivity Matrix | Checks gateway, DNS, domestic/global targets and separates DNS, TCP, HTTP, and path issues. |
+| One-click Package | Web copies Markdown; CLI exports Markdown/JSON with default redaction for remote troubleshooting. |
 
 ## Architecture
 
@@ -32,6 +34,12 @@ A cross-platform network configuration visualization tool for beginners, helping
 │  - GetNetworkSnapshot()  Aggregate all network info         │
 │  - RunDiagnostics()      Execute diagnostic checks          │
 │  - PrintNetworkOverview() CLI formatted output              │
+└─────────────┬───────────────────────────────────────────────┘
+              │
+┌─────────────▼───────────────────────────────────────────────┐
+│        internal/connectivity / internal/report              │
+│  - Check()              Connectivity matrix                 │
+│  - BuildFromSnapshot()  Redacted troubleshooting package    │
 └─────────────┬───────────────────────────────────────────────┘
               │
 ┌─────────────▼───────────────────────────────────────────────┐
@@ -75,6 +83,14 @@ A cross-platform network configuration visualization tool for beginners, helping
 
 ## Quick Start
 
+## Screenshots
+
+These screenshots use redacted demo data and show the real Web console layout, connectivity matrix, and one-click troubleshooting package entry.
+
+![RoutePeek Web console overview](./docs/screenshots/routepeek-overview.png)
+
+<img src="./docs/screenshots/routepeek-mobile.png" alt="RoutePeek mobile view" width="320">
+
 ### Development Build
 
 ```bash
@@ -100,7 +116,24 @@ CGO_ENABLED=0 go build -o routepeek-web ./cmd/server
 ./routepeek diag          # Run network diagnostics
 ./routepeek routes        # View routing table
 ./routepeek interfaces    # View interface details
+./routepeek check         # Check the default connectivity matrix
+./routepeek check baidu.com google.com --json
+./routepeek report --format markdown
+./routepeek report --format json
 ```
+
+The Web home view shows the connectivity matrix and a "Copy Package" button. If the browser Clipboard API is unavailable, RoutePeek shows selectable Markdown text instead.
+
+### HTTP API
+
+| API | Description |
+|-----|-------------|
+| `GET /api/snapshot` | Full network snapshot |
+| `GET /api/diagnosis?lang=zh\|en` | Diagnostic report |
+| `GET /api/overview?lang=zh\|en` | Web aggregate overview |
+| `GET /api/trace?target=` | Traceroute |
+| `GET /api/connectivity?lang=zh\|en` | Connectivity matrix |
+| `GET /api/report?format=markdown\|json&lang=zh\|en` | Redacted remote troubleshooting package |
 
 ### Release Build
 
@@ -111,7 +144,7 @@ scripts/build-release.sh
 # Linux / macOS / Windows, amd64 + arm64
 scripts/build-release.sh --all
 
-# Pre-release checks: Go tests, frontend tests, frontend build, Go build, release script smoke build
+# Pre-release checks: Go tests, frontend tests, frontend build, Go build, Linux/macOS/Windows release smoke build
 scripts/check-release.sh
 ```
 
@@ -122,12 +155,17 @@ The version label defaults to `git describe --tags --always --dirty`: tags are p
 - `index.html not found`: run `cd web && npm run build`, or use `scripts/build-release.sh`.
 - `npm ci` / `npm install` fails: confirm Node.js and npm are available, then check network or npm registry settings.
 - Routes, DNS, or trace results are empty or fail: platform commands may be missing, permissions may be limited, firewalls may block trace, or network devices may not respond. RoutePeek shows understandable empty states and does not auto-fix system settings.
+- Trace degraded to route probe: intermediate hop tracing is limited, so RoutePeek can only confirm exit selection and target port reachability. Administrator privileges may help, but this does not prove the website is down.
+- Fake-IP/TUN: resolving into `198.18.0.0/15` usually means Mihomo/Clash or a similar proxy captured DNS or TUN traffic; the shown path is the local proxy virtual exit.
+- External targets unreachable: if `baidu.com` works but `google.com` / `8.8.8.8` fail, check proxy rules, international exit, DNS pollution, or ISP restrictions first.
 - Public IP is unavailable: the lookup service may be unreachable. If normal browsing works, this warning can usually be ignored.
 
 ## Interface Overview
 
 ### 1. Network Panorama (Home)
 - **Status Summary**: Natural language summary of current network status (e.g., "✅ You are connecting to the Internet via Ethernet").
+- **Connectivity Matrix**: Shows DNS, TCP, HTTP, path, and conclusion per target to distinguish DNS, route, proxy, target-site, or network-exit issues.
+- **Copy Package**: Generates Markdown with system/version, health summary, first advice, key network state, connectivity matrix, diagnostic findings, and redaction notes.
 - **SVG Layered Topology**: Dynamic rendering of LAN, Gateway, and Internet layers with animated connections.
 - **Diagnostic Panel**: Displays reasons and fix suggestions for detected anomalies.
 
@@ -152,8 +190,10 @@ RoutePeek/
 │       └── static/          # Web UI static assets
 ├── internal/
 │   ├── diagnostic/          # Diagnostic engine
+│   ├── connectivity/        # Connectivity matrix
 │   ├── discovery/           # Network info aggregation
-│   └── i18n/                # Internationalization module
+│   ├── i18n/                # Internationalization module
+│   └── report/              # Redacted troubleshooting package
 ├── pkg/
 │   ├── netinfo/             # Cross-platform collection
 │   └── types/               # Data structures
@@ -174,8 +214,8 @@ github.com/spf13/cobra v1.8.0     # CLI Framework
 - [x] SVG Visualization in Web UI
 - [x] Vue Web UI + Go embed single-binary release
 - [x] Release script for current-platform and cross-platform builds
-- [ ] v0.2: Expand VPN, proxy, DNS, route, and multi-interface diagnostics
-- [ ] v0.3: Export JSON/Markdown or copyable health report summaries
+- [x] v0.2: One-click remote troubleshooting package + connectivity matrix
+- [ ] v0.3: Expand VPN, proxy, DNS, route, and multi-interface diagnostics
 - [ ] Support DNS over HTTPS/TLS detection
 - [ ] Integrate traceroute geolocation into detailed lists
 

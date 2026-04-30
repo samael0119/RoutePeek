@@ -289,6 +289,16 @@ button:disabled {
   background: var(--green);
 }
 
+.badge.ok {
+  color: #02130c;
+  background: var(--green);
+}
+
+.badge.danger {
+  color: #26040a;
+  background: var(--red);
+}
+
 .steps {
   border-left: 2px solid var(--line-strong);
   padding-left: 16px;
@@ -374,6 +384,64 @@ button:disabled {
 .findings-section {
   margin-top: 18px;
   padding: 22px;
+}
+
+.connectivity-panel {
+  margin-top: 18px;
+}
+
+.matrix-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+  margin-bottom: 14px;
+}
+
+.matrix-heading h2 {
+  margin: 0;
+  font-size: 1.45rem;
+}
+
+.matrix-wrap {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.matrix-table {
+  min-width: 760px;
+}
+
+.matrix-table td:first-child {
+  display: grid;
+  gap: 2px;
+  min-width: 150px;
+}
+
+.matrix-table small {
+  color: var(--muted);
+}
+
+.conclusion-cell {
+  max-width: 360px;
+  min-width: 260px;
+  white-space: normal;
+}
+
+.fallback-report {
+  width: 100%;
+  min-height: 180px;
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.loading-panel.compact {
+  margin-bottom: 0;
+  box-shadow: none;
 }
 
 .finding-row {
@@ -547,6 +615,7 @@ th {
 
 @media (max-width: 900px) {
   .topbar,
+  .matrix-heading,
   .health-summary,
   .overview-grid,
   .trace-layout,
@@ -555,6 +624,10 @@ th {
   }
 
   .topbar {
+    display: grid;
+  }
+
+  .matrix-heading {
     display: grid;
   }
 
