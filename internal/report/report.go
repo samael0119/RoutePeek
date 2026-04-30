@@ -17,7 +17,7 @@ import (
 	"github.com/samael0119/RoutePeek/pkg/types"
 )
 
-const Version = "0.2.0"
+const Version = "v0.2.1"
 
 // Build collects and redacts the full troubleshooting package.
 func Build(ctx context.Context, lang string) (*types.TroubleshootingReport, error) {

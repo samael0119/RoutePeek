@@ -27,7 +27,7 @@ var rootCmd = &cobra.Command{
 It shows all network interfaces, routes, DNS, VPN, and proxy settings
 in an easy-to-understand format. Great for diagnosing network issues
 like VPN affecting VM connections.`,
-	Version: "0.1.0",
+	Version: "v0.2.1",
 }
 
 var scanCmd = &cobra.Command{

@@ -1,6 +1,8 @@
 package overview
 
 import (
+	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -110,6 +112,24 @@ func TestBuildReportsHealthyStateWhenThereAreNoFindings(t *testing.T) {
 	}
 	if len(result.Actions) != 0 {
 		t.Fatalf("expected no actions, got %#v", result.Actions)
+	}
+}
+
+func TestBuildEncodesEmptyCollectionsAsArrays(t *testing.T) {
+	snapshot := overviewSnapshot()
+	report := &types.DiagnosisReport{Timestamp: snapshot.Timestamp}
+
+	result := Build(snapshot, report)
+	payload, err := json.Marshal(result)
+	if err != nil {
+		t.Fatalf("marshal overview: %v", err)
+	}
+	body := string(payload)
+
+	for _, field := range []string{"findings", "actions", "highlight_nodes"} {
+		if strings.Contains(body, `"`+field+`":null`) {
+			t.Fatalf("expected %s to encode as an empty array, got %s", field, body)
+		}
 	}
 }
 

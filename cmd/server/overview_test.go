@@ -163,7 +163,7 @@ func TestHandleReportReturnsMarkdown(t *testing.T) {
 	buildReport = func(context.Context, *types.NetworkSnapshot, string) *types.TroubleshootingReport {
 		return &types.TroubleshootingReport{
 			Timestamp:    time.Unix(1700000001, 0),
-			Version:      "0.2.0",
+			Version:      "v0.2.1",
 			Redaction:    "redacted",
 			Warnings:     []string{"review"},
 			Overview:     &types.OverviewResponse{Health: types.HealthOverview{Label: "Healthy", Summary: "No issue"}},

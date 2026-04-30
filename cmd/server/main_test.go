@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/samael0119/RoutePeek/pkg/types"
@@ -38,6 +39,26 @@ func TestHandleTraceReturnsJSONErrorWhenTraceFails(t *testing.T) {
 		t.Fatalf("expected status %d, got %d with body %q", http.StatusInternalServerError, rr.Code, rr.Body.String())
 	}
 	assertJSONError(t, rr, "trace_failed")
+}
+
+func TestHandleTraceEncodesEmptyHopsAsArray(t *testing.T) {
+	orig := traceRoute
+	t.Cleanup(func() { traceRoute = orig })
+	traceRoute = func(string) ([]types.TraceHop, error) {
+		return nil, nil
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/trace?target=example.com", nil)
+	rr := httptest.NewRecorder()
+
+	handleTrace(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d with body %q", http.StatusOK, rr.Code, rr.Body.String())
+	}
+	if got := strings.TrimSpace(rr.Body.String()); got != "[]" {
+		t.Fatalf("expected empty hops to encode as [], got %q", got)
+	}
 }
 
 func TestHandleIPLocationReturnsLocation(t *testing.T) {

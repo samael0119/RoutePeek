@@ -16,6 +16,20 @@ var VPNInterfacePrefixes = []string{
 	"tailscale", "nordlynx", "warp", "mullvad", "proton", "wireguard",
 }
 
+var WindowsVPNInterfaceKeywords = []string{
+	"vpn",
+	"wireguard",
+	"tailscale",
+	"anyconnect",
+	"fortinet",
+	"globalprotect",
+	"pangp",
+	"openvpn",
+	"tap-windows",
+	"zerotier",
+	"warp",
+}
+
 // Common VMware subnets
 var CommonVMwareSubnets = []string{
 	"192.168.56.0/24",  // VMnet8 (NAT)
@@ -26,15 +40,15 @@ var CommonVMwareSubnets = []string{
 
 // Common VirtualBox subnets
 var CommonVirtualBoxSubnets = []string{
-	"192.168.56.0/24",  // VirtualBox NAT
-	"10.0.2.0/24",      // VirtualBox default NAT
-	"192.168.59.0/24",  // VirtualBox host-only
+	"192.168.56.0/24", // VirtualBox NAT
+	"10.0.2.0/24",     // VirtualBox default NAT
+	"192.168.59.0/24", // VirtualBox host-only
 }
 
 // Common Docker subnets
 var CommonDockerSubnets = []string{
-	"172.17.0.0/16",   // Docker default bridge
-	"172.18.0.0/16",   // Docker user-defined bridge
+	"172.17.0.0/16", // Docker default bridge
+	"172.18.0.0/16", // Docker user-defined bridge
 	"172.19.0.0/16",
 	"172.20.0.0/16",
 	"172.21.0.0/16",

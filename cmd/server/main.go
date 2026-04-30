@@ -181,6 +181,7 @@ func handleInterfaces(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusInternalServerError, "interfaces_failed", err.Error())
 		return
 	}
+	interfaces = nonNilSlice(interfaces)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(interfaces)
@@ -192,6 +193,7 @@ func handleRoutes(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusInternalServerError, "routes_failed", err.Error())
 		return
 	}
+	routes = nonNilSlice(routes)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(routes)
@@ -213,9 +215,17 @@ func handleTrace(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusInternalServerError, "trace_failed", err.Error())
 		return
 	}
+	hops = nonNilSlice(hops)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(hops)
+}
+
+func nonNilSlice[T any](items []T) []T {
+	if items == nil {
+		return []T{}
+	}
+	return items
 }
 
 func handleIPLocation(w http.ResponseWriter, r *http.Request) {

@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/samael0119/RoutePeek/pkg/types"
 )
@@ -262,5 +263,75 @@ func TestTraceRouteLinuxFallsBackToTCPProbeWhenHostnameLookupFails(t *testing.T)
 	}
 	if !reflect.DeepEqual(hops, want) {
 		t.Fatalf("hostname fallback hops mismatch\nwant: %#v\n got: %#v", want, hops)
+	}
+}
+
+func TestParseWindowsRoutePrintOutputSkipsLocalizedHeaders(t *testing.T) {
+	output := `===========================================================================
+IPv4 Route Table
+===========================================================================
+Active Routes:
+Network Destination        Netmask          Gateway       Interface  Metric
+����Ŀ��                  ����            ����          �ӿ�        Ծ����
+          0.0.0.0          0.0.0.0    192.168.1.1  192.168.1.23     25
+        127.0.0.0        255.0.0.0         On-link      127.0.0.1    331
+===========================================================================
+`
+
+	got := parseWindowsRoutePrintOutput(output)
+
+	want := []types.RouteEntry{
+		{Destination: "0.0.0.0/0", Gateway: "192.168.1.1", Interface: "192.168.1.23", Metric: 25, Table: "main"},
+		{Destination: "127.0.0.0/8", Gateway: "On-link", Interface: "127.0.0.1", Metric: 331, Table: "main"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("windows routes mismatch\nwant: %#v\n got: %#v", want, got)
+	}
+}
+
+func TestParseWindowsTraceOutputCombinesSplitRTTFields(t *testing.T) {
+	output := `Tracing route to 8.8.8.8 over a maximum of 12 hops
+
+  1    <1 ms    <1 ms     1 ms  192.168.1.1
+  2     *        *        *     Request timed out.
+`
+
+	got, err := parseWindowsTraceOutput(output)
+	if err != nil {
+		t.Fatalf("parseWindowsTraceOutput returned error: %v", err)
+	}
+
+	want := []types.TraceHop{
+		{Hop: 1, Address: "192.168.1.1", RTT1: "<1 ms", RTT2: "<1 ms", RTT3: "1 ms"},
+		{Hop: 2, Address: "*"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("windows trace mismatch\nwant: %#v\n got: %#v", want, got)
+	}
+}
+
+func TestTraceRouteWindowsUsesLongerTimeoutAndPartialOutput(t *testing.T) {
+	orig := commandRunnerWithTimeout
+	t.Cleanup(func() { commandRunnerWithTimeout = orig })
+
+	var gotTimeout time.Duration
+	commandRunnerWithTimeout = func(timeout time.Duration, name string, args ...string) ([]byte, error) {
+		gotTimeout = timeout
+		if name != "tracert" {
+			t.Fatalf("unexpected command %q", name)
+		}
+		return []byte("  1     1 ms     1 ms     1 ms  192.168.1.1\n"), errors.New("tracert timed out")
+	}
+
+	hops, err := traceRouteWindows("8.8.8.8")
+	if err != nil {
+		t.Fatalf("traceRouteWindows returned error: %v", err)
+	}
+	if gotTimeout <= commandTimeout {
+		t.Fatalf("expected Windows tracert timeout to exceed default command timeout, got %s", gotTimeout)
+	}
+	want := []types.TraceHop{{Hop: 1, Address: "192.168.1.1", RTT1: "1 ms", RTT2: "1 ms", RTT3: "1 ms"}}
+	if !reflect.DeepEqual(hops, want) {
+		t.Fatalf("partial Windows trace mismatch\nwant: %#v\n got: %#v", want, hops)
 	}
 }

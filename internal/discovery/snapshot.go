@@ -71,7 +71,27 @@ func GetNetworkSnapshot() (*types.NetworkSnapshot, error) {
 		snapshot.PublicIP = pubIP
 	}
 
+	normalizeSnapshotCollections(snapshot)
+
 	return snapshot, nil
+}
+
+func normalizeSnapshotCollections(snapshot *types.NetworkSnapshot) {
+	if snapshot.Interfaces == nil {
+		snapshot.Interfaces = []types.NetworkInterface{}
+	}
+	if snapshot.Routes == nil {
+		snapshot.Routes = []types.RouteEntry{}
+	}
+	if snapshot.DNS.Servers == nil {
+		snapshot.DNS.Servers = []string{}
+	}
+	if snapshot.DNS.Search == nil {
+		snapshot.DNS.Search = []string{}
+	}
+	if snapshot.VMNetworks == nil {
+		snapshot.VMNetworks = []types.VMNetwork{}
+	}
 }
 
 // GetInterfaces returns all network interfaces

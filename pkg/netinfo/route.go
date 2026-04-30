@@ -183,8 +183,12 @@ func getWindowsRoutes() ([]types.RouteEntry, error) {
 		return nil, fmt.Errorf("failed to run 'route print': %w", err)
 	}
 
+	return parseWindowsRoutePrintOutput(string(output)), nil
+}
+
+func parseWindowsRoutePrintOutput(output string) []types.RouteEntry {
 	var routes []types.RouteEntry
-	scanner := bufio.NewScanner(strings.NewReader(string(output)))
+	scanner := bufio.NewScanner(strings.NewReader(output))
 	capture := false
 
 	for scanner.Scan() {
@@ -208,26 +212,43 @@ func getWindowsRoutes() ([]types.RouteEntry, error) {
 		// Parse route entries (typical format: Network Destination  Netmask  Gateway  Interface  Metric)
 		parts := strings.Fields(line)
 		if len(parts) >= 5 {
+			if net.ParseIP(parts[0]) == nil || net.ParseIP(parts[1]) == nil {
+				continue
+			}
 			entry := types.RouteEntry{
-				Destination: parts[0],
+				Destination: windowsRouteDestination(parts[0], parts[1]),
 				Gateway:     parts[2],
 				Interface:   parts[3],
 				Table:       "main",
 			}
 
-			if len(parts) >= 6 {
-				if m, err := strconv.Atoi(parts[5]); err == nil {
-					entry.Metric = m
-				}
+			if m, err := strconv.Atoi(parts[len(parts)-1]); err == nil {
+				entry.Metric = m
 			}
 
-			if entry.Destination != "" && entry.Destination != "Gateway" {
+			if entry.Destination != "" {
 				routes = append(routes, entry)
 			}
 		}
 	}
 
-	return routes, nil
+	if routes == nil {
+		return []types.RouteEntry{}
+	}
+	return routes
+}
+
+func windowsRouteDestination(destination string, mask string) string {
+	ip := net.ParseIP(destination).To4()
+	maskIP := net.ParseIP(mask).To4()
+	if ip == nil || maskIP == nil {
+		return destination
+	}
+	ones, bits := net.IPMask(maskIP).Size()
+	if bits != 32 || ones < 0 {
+		return destination
+	}
+	return fmt.Sprintf("%s/%d", destination, ones)
 }
 
 // GetInterfaceRoutes returns routes associated with a specific interface
@@ -516,7 +537,10 @@ func traceRouteMac(target string) ([]types.TraceHop, error) {
 
 func traceRouteWindows(target string) ([]types.TraceHop, error) {
 	// Use tracert on Windows
-	output, err := commandRunner("tracert", "-d", "-h", "12", "-w", "1000", target)
+	output, err := commandRunnerWithTimeout(traceCommandTimeout, "tracert", "-d", "-h", "12", "-w", "1000", target)
+	if hops, parseErr := parseWindowsTraceOutput(string(output)); parseErr == nil && len(hops) > 0 {
+		return annotateTraceMode(hops), nil
+	}
 	if err != nil {
 		return nil, fmt.Errorf("tracert failed: %w", err)
 	}
@@ -692,6 +716,19 @@ func parseWindowsTraceOutput(output string) ([]types.TraceHop, error) {
 		// Parse RTT values - fields between hop number and IP
 		for i := 1; i < len(fields); i++ {
 			f := fields[i]
+			if i+1 < len(fields) && fields[i+1] == "ms" && (isWindowsRTTNumber(f) || strings.HasPrefix(f, "<")) {
+				val := f + " ms"
+				switch {
+				case hop.RTT1 == "":
+					hop.RTT1 = val
+				case hop.RTT2 == "":
+					hop.RTT2 = val
+				case hop.RTT3 == "":
+					hop.RTT3 = val
+				}
+				i++
+				continue
+			}
 			if strings.HasSuffix(f, "ms") || strings.HasSuffix(f, "s") {
 				val := strings.Trim(strings.Trim(f, "ms"), "s")
 				switch {
@@ -711,4 +748,9 @@ func parseWindowsTraceOutput(output string) ([]types.TraceHop, error) {
 	}
 
 	return hops, nil
+}
+
+func isWindowsRTTNumber(value string) bool {
+	_, err := strconv.ParseFloat(value, 64)
+	return err == nil
 }

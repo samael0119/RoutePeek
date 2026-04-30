@@ -23,30 +23,33 @@ func DetectVPN() *types.VPNInfo {
 			continue
 		}
 
-		for _, prefix := range VPNInterfacePrefixes {
-			if strings.HasPrefix(strings.ToLower(iface.Name), prefix) {
-				vpn.Interface = iface.Name
-				vpn.Status = "connected"
+		if looksLikeVPNInterface(iface.Name) {
+			vpn.Interface = iface.Name
+			vpn.Status = "connected"
 
-				addrs, _ := iface.Addrs()
-				for _, addr := range addrs {
-					if v, ok := addr.(*net.IPNet); ok && v.IP.To4() != nil {
-						vpn.ClientIP = v.IP.String()
-						vpn.Protocol = guessVPNProtocol(v.IP)
-					}
+			addrs, _ := iface.Addrs()
+			for _, addr := range addrs {
+				if v, ok := addr.(*net.IPNet); ok && v.IP.To4() != nil {
+					vpn.ClientIP = v.IP.String()
+					vpn.Protocol = guessVPNProtocol(v.IP)
 				}
-
-				return vpn
 			}
+
+			return vpn
 		}
 	}
 
-	// Fallback: check routes for non-default-gateway 0.0.0.0/0 routes
 	routes, _ := GetRoutes()
 	defaultGw, _ := GetDefaultGateway()
+	networkInterfaces, _ := GetNetworkInterfaces()
+	if routeVPN := vpnFromRoutes(routes, defaultGw, networkInterfaces); routeVPN != nil {
+		return routeVPN
+	}
+
+	// Fallback: check routes for non-default-gateway 0.0.0.0/0 routes
 	for _, route := range routes {
 		if route.Destination == "default" || route.Destination == "0.0.0.0/0" {
-			if route.Interface != "" && route.Gateway != defaultGw {
+			if route.Interface != "" && route.Gateway != defaultGw && looksLikeVPNInterface(route.Interface) {
 				// This interface routes all traffic but isn't the default gateway - likely VPN
 				vpn.Interface = route.Interface
 				vpn.Status = "connected"
@@ -70,11 +73,68 @@ func DetectVPN() *types.VPNInfo {
 	return vpn
 }
 
+func looksLikeVPNInterface(name string) bool {
+	lower := strings.ToLower(name)
+	for _, prefix := range VPNInterfacePrefixes {
+		if strings.HasPrefix(lower, prefix) {
+			return true
+		}
+	}
+	for _, keyword := range WindowsVPNInterfaceKeywords {
+		if strings.Contains(lower, keyword) {
+			return true
+		}
+	}
+	return false
+}
+
+func vpnFromRoutes(routes []types.RouteEntry, defaultGw string, interfaces []types.NetworkInterface) *types.VPNInfo {
+	for _, route := range routes {
+		if route.Destination != "default" && route.Destination != "0.0.0.0/0" {
+			continue
+		}
+		if route.Interface == "" || route.Gateway == "" || route.Gateway == defaultGw {
+			continue
+		}
+
+		for _, iface := range interfaces {
+			if !iface.IsUp {
+				continue
+			}
+			if !routeMatchesInterface(route.Interface, iface) {
+				continue
+			}
+			return &types.VPNInfo{
+				Name:      iface.Name,
+				Interface: iface.Name,
+				Status:    "connected",
+				ClientIP:  iface.IP4,
+				Protocol:  guessVPNProtocol(net.ParseIP(iface.IP4)),
+			}
+		}
+	}
+	return nil
+}
+
+func routeMatchesInterface(routeInterface string, iface types.NetworkInterface) bool {
+	if routeInterface == "" {
+		return false
+	}
+	if !interfaceLooksLikeVPN(iface) && !looksLikeVPNInterface(routeInterface) {
+		return false
+	}
+	return iface.IP4 != "" && routeInterface == iface.IP4 || strings.EqualFold(routeInterface, iface.Name)
+}
+
+func interfaceLooksLikeVPN(iface types.NetworkInterface) bool {
+	return iface.Type == "vpn" || looksLikeVPNInterface(iface.Name)
+}
+
 // guessVPNProtocol identifies VPN type by IP range
 func guessVPNProtocol(ip net.IP) string {
 	vpnRanges := map[string]string{
-		"10.0.0.0/8":    "openvpn/wireguard",
-		"172.16.0.0/12": "ipsec/vpn",
+		"10.0.0.0/8":     "openvpn/wireguard",
+		"172.16.0.0/12":  "ipsec/vpn",
 		"192.168.0.0/16": "various",
 	}
 

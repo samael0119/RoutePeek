@@ -24,9 +24,11 @@ func Build(snapshot *types.NetworkSnapshot, report *types.DiagnosisReport) *type
 // BuildWithLang converts low-level data into a UI-ready model in an explicit language.
 func BuildWithLang(snapshot *types.NetworkSnapshot, report *types.DiagnosisReport, lang string) *types.OverviewResponse {
 	lang = i18n.NormalizeLang(lang)
+	snapshot = normalizeSnapshot(snapshot)
 	if report == nil {
 		report = &types.DiagnosisReport{}
 	}
+	report = normalizeDiagnosisReport(report)
 
 	findings := append([]types.DiagnosisResult(nil), report.Findings...)
 	sort.SliceStable(findings, func(i, j int) bool {
@@ -52,6 +54,37 @@ func BuildWithLang(snapshot *types.NetworkSnapshot, report *types.DiagnosisRepor
 		Actions:   actions,
 		Topology:  buildTopology(snapshot, highlights, lang),
 	}
+}
+
+func normalizeSnapshot(snapshot *types.NetworkSnapshot) *types.NetworkSnapshot {
+	if snapshot == nil {
+		return nil
+	}
+	normalized := *snapshot
+	if normalized.Interfaces == nil {
+		normalized.Interfaces = []types.NetworkInterface{}
+	}
+	if normalized.Routes == nil {
+		normalized.Routes = []types.RouteEntry{}
+	}
+	if normalized.DNS.Servers == nil {
+		normalized.DNS.Servers = []string{}
+	}
+	if normalized.DNS.Search == nil {
+		normalized.DNS.Search = []string{}
+	}
+	if normalized.VMNetworks == nil {
+		normalized.VMNetworks = []types.VMNetwork{}
+	}
+	return &normalized
+}
+
+func normalizeDiagnosisReport(report *types.DiagnosisReport) *types.DiagnosisReport {
+	normalized := *report
+	if normalized.Findings == nil {
+		normalized.Findings = []types.DiagnosisResult{}
+	}
+	return &normalized
 }
 
 func buildHealth(findings []types.DiagnosisResult, lang string) types.HealthOverview {
