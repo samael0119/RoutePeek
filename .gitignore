@@ -24,6 +24,11 @@ Thumbs.db
 # Dependency directories
 vendor/
 
+# Build and dependency outputs
+/dist/
+web/node_modules/
+web/dist/
+
 routepeek
 routepeek-web
 

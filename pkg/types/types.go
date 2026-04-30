@@ -67,11 +67,11 @@ type VMNetwork struct {
 type NetworkSnapshot struct {
 	Timestamp      time.Time          `json:"timestamp"`
 	Interfaces     []NetworkInterface `json:"interfaces"`
-	Routes         []RouteEntry      `json:"routes"`
-	DNS            DNSConfig         `json:"dns"`
-	Proxy          ProxyConfig       `json:"proxy"`
-	VPN            *VPNInfo          `json:"vpn,omitempty"`
-	VMNetworks     []VMNetwork       `json:"vm_networks"`
+	Routes         []RouteEntry       `json:"routes"`
+	DNS            DNSConfig          `json:"dns"`
+	Proxy          ProxyConfig        `json:"proxy"`
+	VPN            *VPNInfo           `json:"vpn,omitempty"`
+	VMNetworks     []VMNetwork        `json:"vm_networks"`
 	DefaultGateway string             `json:"default_gateway"`
 	PublicIP       string             `json:"public_ip"`
 }
@@ -94,10 +94,71 @@ type DiagnosisReport struct {
 
 // TraceHop represents a single hop in a traceroute
 type TraceHop struct {
-	Hop     int    `json:"hop"`
-	Address string `json:"address"`
-	RTT1    string `json:"rtt1"`
-	RTT2    string `json:"rtt2"`
-	RTT3    string `json:"rtt3"`
+	Hop      int    `json:"hop"`
+	Address  string `json:"address"`
+	RTT1     string `json:"rtt1"`
+	RTT2     string `json:"rtt2"`
+	RTT3     string `json:"rtt3"`
 	Hostname string `json:"hostname,omitempty"`
+	Mode     string `json:"mode,omitempty"`
+}
+
+// IPLocation describes a public IP geolocation lookup result.
+type IPLocation struct {
+	Country string `json:"country"`
+	City    string `json:"city"`
+	Org     string `json:"org"`
+}
+
+// OverviewResponse is the frontend-oriented aggregate for the web UI.
+type OverviewResponse struct {
+	Snapshot  *NetworkSnapshot `json:"snapshot"`
+	Diagnosis *DiagnosisReport `json:"diagnosis"`
+	Health    HealthOverview   `json:"health"`
+	Actions   []ActionItem     `json:"actions"`
+	Topology  NetworkTopology  `json:"topology"`
+}
+
+// HealthOverview summarizes the current network state in user-facing terms.
+type HealthOverview struct {
+	Status       string `json:"status"`
+	RiskLevel    string `json:"risk_level"`
+	Label        string `json:"label"`
+	PrimaryIssue string `json:"primary_issue,omitempty"`
+	Summary      string `json:"summary"`
+}
+
+// ActionItem explains one diagnostic finding as a safe troubleshooting action.
+type ActionItem struct {
+	Code       string   `json:"code"`
+	Severity   string   `json:"severity"`
+	Title      string   `json:"title"`
+	Category   string   `json:"category"`
+	Impact     string   `json:"impact"`
+	Steps      []string `json:"steps"`
+	Verify     string   `json:"verify"`
+	TargetNode string   `json:"target_node"`
+	Confidence string   `json:"confidence"`
+}
+
+// NetworkTopology describes the simplified path shown in the frontend.
+type NetworkTopology struct {
+	Nodes          []TopologyNode `json:"nodes"`
+	Links          []TopologyLink `json:"links"`
+	HighlightNodes []string       `json:"highlight_nodes"`
+}
+
+type TopologyNode struct {
+	ID          string `json:"id"`
+	Label       string `json:"label"`
+	Kind        string `json:"kind"`
+	Status      string `json:"status"`
+	Description string `json:"description,omitempty"`
+}
+
+type TopologyLink struct {
+	From   string `json:"from"`
+	To     string `json:"to"`
+	Status string `json:"status"`
+	Label  string `json:"label,omitempty"`
 }

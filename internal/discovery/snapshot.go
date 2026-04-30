@@ -12,6 +12,18 @@ import (
 	"github.com/samael0119/RoutePeek/pkg/types"
 )
 
+var (
+	getNetworkInterfaces = netinfo.GetNetworkInterfaces
+	getLoopbackInterface = netinfo.GetLoopbackInterface
+	getRoutes            = netinfo.GetRoutes
+	getDefaultGateway    = netinfo.GetDefaultGateway
+	getDNSConfig         = netinfo.GetDNSConfig
+	detectProxy          = netinfo.DetectProxy
+	detectVPN            = netinfo.DetectVPN
+	detectVMNetworks     = netinfo.DetectVMNetworks
+	fetchPublicIP        = getPublicIP
+)
+
 // GetNetworkSnapshot returns a complete snapshot of network state
 func GetNetworkSnapshot() (*types.NetworkSnapshot, error) {
 	snapshot := &types.NetworkSnapshot{
@@ -19,46 +31,43 @@ func GetNetworkSnapshot() (*types.NetworkSnapshot, error) {
 	}
 
 	// Get network interfaces
-	interfaces, err := netinfo.GetNetworkInterfaces()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get interfaces: %w", err)
+	if interfaces, err := getNetworkInterfaces(); err == nil {
+		snapshot.Interfaces = interfaces
 	}
-	snapshot.Interfaces = interfaces
 
 	// Get loopback separately
-	if lo, err := netinfo.GetLoopbackInterface(); err == nil {
+	if lo, err := getLoopbackInterface(); err == nil {
 		snapshot.Interfaces = append(snapshot.Interfaces, *lo)
 	}
 
 	// Get routes
-	routes, err := netinfo.GetRoutes()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get routes: %w", err)
+	if routes, err := getRoutes(); err == nil {
+		snapshot.Routes = routes
 	}
-	snapshot.Routes = routes
 
 	// Get default gateway
-	if gw, err := netinfo.GetDefaultGateway(); err == nil {
+	if gw, err := getDefaultGateway(); err == nil {
 		snapshot.DefaultGateway = gw
 	}
 
 	// Get DNS config
-	dns, err := netinfo.GetDNSConfig()
-	if err == nil {
+	if dns, err := getDNSConfig(); err == nil {
 		snapshot.DNS = *dns
 	}
 
 	// Get proxy config
-	snapshot.Proxy = *netinfo.DetectProxy()
+	if proxy := detectProxy(); proxy != nil {
+		snapshot.Proxy = *proxy
+	}
 
 	// Get VPN info
-	snapshot.VPN = netinfo.DetectVPN()
+	snapshot.VPN = detectVPN()
 
 	// Get VM networks
-	snapshot.VMNetworks = netinfo.DetectVMNetworks()
+	snapshot.VMNetworks = detectVMNetworks()
 
 	// Get public IP (optional, may fail)
-	if pubIP, err := getPublicIP(); err == nil {
+	if pubIP, err := fetchPublicIP(); err == nil {
 		snapshot.PublicIP = pubIP
 	}
 

@@ -70,25 +70,59 @@
 - 虚拟机网段连通性检测：探测 Docker/VMware/VirtualBox/Hyper-V 网段
 
 ### 安全机制
-- 一键修复（Phase 2）：备份 → 二次确认 → 自动回滚
-- 诊断结果附带具体修复建议，非纯警告
+- 只读诊断：RoutePeek 不会自动修改系统网络、代理、DNS、路由或 VPN 配置
+- 诊断结果附带解释和手动排查建议，所有系统修改都由用户自行确认执行
 
 ## 快速开始
 
+### 开发构建
+
 ```bash
-# 编译
-go build -o RoutePeek ./cmd/cli
-go build -o RoutePeek-web ./cmd/server
+# 安装并构建 Vue 前端，产物写入 cmd/server/static/dist/
+cd web
+npm install
+npm run build
+cd ..
+
+# 构建 Go CLI 和 Web 单二进制
+CGO_ENABLED=0 go build -o routepeek ./cmd/cli
+CGO_ENABLED=0 go build -o routepeek-web ./cmd/server
+```
+
+### 运行
+
+```bash
+# Web 界面
+./routepeek-web           # 启动 Web 服务器（默认 8080 端口）
 
 # 命令行使用
-./RoutePeek scan          # 查看完整网络配置
-./RoutePeek diag          # 运行网络诊断
-./RoutePeek routes        # 查看路由表
-./RoutePeek interfaces    # 查看网卡详情
-
-# Web 界面
-./RoutePeek-web           # 启动 Web 服务器（默认 8080 端口）
+./routepeek scan          # 查看完整网络配置
+./routepeek diag          # 运行网络诊断
+./routepeek routes        # 查看路由表
+./routepeek interfaces    # 查看网卡详情
 ```
+
+### 正式打包
+
+```bash
+# 当前平台
+scripts/build-release.sh
+
+# Linux / macOS / Windows 的 amd64 + arm64
+scripts/build-release.sh --all
+
+# 发布前检查：Go 测试、前端测试、前端 build、Go build、发布脚本 smoke build
+scripts/check-release.sh
+```
+
+发布版本号默认来自 `git describe --tags --always --dirty`：有 tag 时使用 tag，未打 tag 时使用 commit hash，工作区有未提交变更时追加 dirty 标记。根目录 `dist/` 是本地发布产物目录，不纳入版本库；`cmd/server/static/dist/` 是 Web 单二进制嵌入资源目录，由 `npm run build` 或发布脚本生成。
+
+### 常见失败排查
+
+- `index.html not found`：先运行 `cd web && npm run build`，或直接使用 `scripts/build-release.sh`。
+- `npm ci` / `npm install` 失败：确认 Node.js 和 npm 可用，并检查网络或 npm registry 配置。
+- 路由、DNS、trace 为空或失败：可能是平台命令不可用、权限不足、防火墙拦截或运营商设备不响应；RoutePeek 会展示可理解的空态，不会自动修复系统设置。
+- 公网 IP 未获取：公网查询服务可能不可达。若网页访问正常，可先忽略该提示。
 
 ## 界面概览
 
@@ -138,12 +172,12 @@ github.com/spf13/cobra v1.8.0     # CLI 框架
 ## 后续计划
 
 - [x] Web UI 使用 SVG 可视化拓扑图
-- [ ] Phase 2: 一键修复（备份 + 确认 + 回滚）
-- [ ] Web UI 迁移 Vue/React（提升复杂场景下的响应速度与可维护性）
-- [ ] 创建 Makefile 支持一键跨平台编译
+- [x] Vue Web UI + Go embed 单二进制发布
+- [x] 发布脚本支持当前平台与跨平台构建
+- [ ] v0.2: 扩展 VPN、代理、DNS、路由、多网卡诊断深度
+- [ ] v0.3: 导出 JSON/Markdown 或复制摘要的体检报告
 - [ ] 支持 DNS over HTTPS/TLS 检测（安全审计）
 - [ ] Traceroute 跳跃点地理定位集成到详细列表
-- [ ] 导出 PDF/图片格式的诊断报告
 
 ## 设计背景
 

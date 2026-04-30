@@ -20,3 +20,15 @@ func TestI18n(t *testing.T) {
 		t.Errorf("Expected 'Test', got '%s'", T("test_key"))
 	}
 }
+
+func TestTForTranslatesWithoutChangingCurrentLanguage(t *testing.T) {
+	os.Setenv("LANG", "zh_CN.UTF-8")
+	Init()
+
+	if got := TFor("en", "test_key"); got != "Test" {
+		t.Fatalf("expected explicit English translation, got %q", got)
+	}
+	if got := T("test_key"); got != "测试" {
+		t.Fatalf("expected current language to remain Chinese, got %q", got)
+	}
+}

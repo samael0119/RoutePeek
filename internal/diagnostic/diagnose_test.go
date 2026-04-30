@@ -48,10 +48,38 @@ func TestRunDiagnosticsAllowsMissingPublicIPAsWarning(t *testing.T) {
 	}
 }
 
+func TestRunDiagnosticsReportsNoActiveInterfaces(t *testing.T) {
+	snapshot := baseSnapshot()
+	snapshot.Interfaces = nil
+
+	report := RunDiagnostics(snapshot)
+
+	if !hasFinding(report, "NO_ACTIVE_IFACE") {
+		t.Fatalf("expected NO_ACTIVE_IFACE finding, got %#v", report.Findings)
+	}
+}
+
+func TestRunDiagnosticsReportsNoRoutes(t *testing.T) {
+	snapshot := baseSnapshot()
+	snapshot.Routes = nil
+
+	report := RunDiagnostics(snapshot)
+
+	if !hasFinding(report, "NO_ROUTES") {
+		t.Fatalf("expected NO_ROUTES finding, got %#v", report.Findings)
+	}
+}
+
 func baseSnapshot() *types.NetworkSnapshot {
 	return &types.NetworkSnapshot{
 		Timestamp:      time.Unix(1700000000, 0),
 		DefaultGateway: "192.168.1.1",
+		Interfaces: []types.NetworkInterface{
+			{Name: "eth0", IP4: "192.168.1.20", IsUp: true, Type: "ethernet"},
+		},
+		Routes: []types.RouteEntry{
+			{Destination: "0.0.0.0/0", Gateway: "192.168.1.1", Interface: "eth0", Metric: 100},
+		},
 		DNS: types.DNSConfig{
 			Servers: []string{"1.1.1.1"},
 			Port:    53,

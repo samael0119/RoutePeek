@@ -7,9 +7,22 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/samael0119/RoutePeek/pkg/types"
 )
+
+var tcpPortProbe = func(target string, port string) (bool, string) {
+	start := time.Now()
+	conn, err := net.DialTimeout("tcp", net.JoinHostPort(target, port), 1500*time.Millisecond)
+	if err != nil {
+		return false, ""
+	}
+	_ = conn.Close()
+	return true, fmt.Sprintf("%.1f ms", float64(time.Since(start).Microseconds())/1000)
+}
+
+var lookupIP = net.LookupIP
 
 // GetRoutes returns the routing table entries
 func GetRoutes() ([]types.RouteEntry, error) {
@@ -284,37 +297,235 @@ func TraceRoute(target string) ([]types.TraceHop, error) {
 }
 
 func traceRouteLinux(target string) ([]types.TraceHop, error) {
-	output, tracepathErr := commandRunner("tracepath", "-m", "30", target)
-	if tracepathErr == nil {
-		return parseTracerouteOutput(string(output))
+	output, tracepathErr := commandRunner("tracepath", "-m", "12", target)
+	if hops, ok := responsiveTraceOutput(output); ok {
+		return annotateTraceMode(hops), nil
 	}
 
-	output, tracerouteErr := commandRunner("traceroute", "-n", "-m", "30", "-q", "1", "-w", "2", target)
-	if tracerouteErr == nil {
-		return parseTracerouteOutput(string(output))
+	output, tracerouteErr := commandRunner("traceroute", "-n", "-m", "12", "-q", "3", "-w", "1", target)
+	if hops, ok := responsiveTraceOutput(output); ok {
+		return annotateTraceMode(hops), nil
 	}
 
-	return nil, fmt.Errorf("tracepath failed: %v; traceroute failed: %w", tracepathErr, tracerouteErr)
+	output, tcpTracerouteErr := commandRunner("traceroute", "-T", "-p", "443", "-n", "-m", "12", "-q", "3", "-w", "1", target)
+	if hops, ok := responsiveTraceOutput(output); ok {
+		return annotateTraceMode(hops), nil
+	}
+
+	if hops, err := routeProbeFallback(target); err == nil && len(hops) > 0 {
+		return hops, nil
+	}
+
+	return nil, fmt.Errorf("tracepath failed: %v; traceroute failed: %v; tcp traceroute failed: %w", tracepathErr, tracerouteErr, tcpTracerouteErr)
+}
+
+func responsiveTraceOutput(output []byte) ([]types.TraceHop, bool) {
+	if len(output) == 0 {
+		return nil, false
+	}
+	hops, err := parseTracerouteOutput(string(output))
+	if err != nil || !hasResponsiveHop(hops) {
+		return nil, false
+	}
+	return hops, true
+}
+
+func hasResponsiveHop(hops []types.TraceHop) bool {
+	for _, hop := range hops {
+		if strings.TrimSpace(hop.Address) != "" && strings.TrimSpace(hop.Address) != "*" {
+			return true
+		}
+		if strings.TrimSpace(hop.RTT1) != "" && strings.TrimSpace(hop.RTT1) != "*" {
+			return true
+		}
+		if strings.TrimSpace(hop.RTT2) != "" && strings.TrimSpace(hop.RTT2) != "*" {
+			return true
+		}
+		if strings.TrimSpace(hop.RTT3) != "" && strings.TrimSpace(hop.RTT3) != "*" {
+			return true
+		}
+	}
+	return false
+}
+
+func annotateTraceMode(hops []types.TraceHop) []types.TraceHop {
+	if !isProxyFakeIPTrace(hops) {
+		return hops
+	}
+	for i := range hops {
+		hops[i].Mode = "proxy_fake_ip"
+	}
+	return hops
+}
+
+func isProxyFakeIPTrace(hops []types.TraceHop) bool {
+	last := lastResponsiveAddress(hops)
+	if last == "" {
+		return false
+	}
+	ip := net.ParseIP(last)
+	if ip == nil {
+		return false
+	}
+	_, fakeIPNet, err := net.ParseCIDR("198.18.0.0/15")
+	return err == nil && fakeIPNet.Contains(ip)
+}
+
+func lastResponsiveAddress(hops []types.TraceHop) string {
+	for i := len(hops) - 1; i >= 0; i-- {
+		address := strings.TrimSpace(hops[i].Address)
+		if address != "" && address != "*" {
+			return address
+		}
+	}
+	return ""
+}
+
+func routeProbeFallback(target string) ([]types.TraceHop, error) {
+	routeTarget, err := routeLookupTarget(target)
+	routeLookupAvailable := err == nil
+	if !routeLookupAvailable {
+		routeTarget = target
+	}
+
+	hops := []types.TraceHop{}
+	if routeLookupAvailable {
+		output, err := commandRunner("ip", "route", "get", routeTarget)
+		if err == nil {
+			via, dev, src := parseIPRouteGet(string(output))
+			if via != "" {
+				hop := types.TraceHop{Hop: 1, Address: via, Mode: "route_probe"}
+				if dev != "" {
+					hop.Hostname = via + " via " + dev
+				} else {
+					hop.Hostname = via
+				}
+				hops = append(hops, hop)
+			} else if src != "" {
+				hop := types.TraceHop{Hop: 1, Address: src, Mode: "route_probe"}
+				if dev != "" {
+					hop.Hostname = src + " via " + dev
+				} else {
+					hop.Hostname = src
+				}
+				hops = append(hops, hop)
+			}
+		}
+	}
+
+	for _, port := range []string{"443", "80", "53"} {
+		if rtts := tcpProbeSamples(target, port, 3); len(rtts) > 0 {
+			hops = append(hops, types.TraceHop{
+				Hop:      len(hops) + 1,
+				Address:  routeTarget,
+				Hostname: routeTarget + " tcp/" + port + " reachable",
+				RTT1:     rttAt(rtts, 0),
+				RTT2:     rttAt(rtts, 1),
+				RTT3:     rttAt(rtts, 2),
+				Mode:     "route_probe",
+			})
+			return hops, nil
+		}
+	}
+
+	if len(hops) > 0 {
+		hops = append(hops, types.TraceHop{
+			Hop:      len(hops) + 1,
+			Address:  "*",
+			Hostname: "target tcp unreachable",
+			RTT1:     "*",
+			Mode:     "route_probe",
+		})
+		return hops, nil
+	}
+
+	return []types.TraceHop{{
+		Hop:      1,
+		Address:  routeTarget,
+		Hostname: routeTarget + " tcp unreachable",
+		RTT1:     "*",
+		Mode:     "route_probe",
+	}}, nil
+}
+
+func tcpProbeSamples(target string, port string, count int) []string {
+	rtts := []string{}
+	for i := 0; i < count; i++ {
+		ok, rtt := tcpPortProbe(target, port)
+		if ok && rtt != "" {
+			rtts = append(rtts, rtt)
+		}
+	}
+	return rtts
+}
+
+func rttAt(rtts []string, index int) string {
+	if index < len(rtts) {
+		return rtts[index]
+	}
+	return ""
+}
+
+func routeLookupTarget(target string) (string, error) {
+	if ip := net.ParseIP(target); ip != nil {
+		return target, nil
+	}
+	ips, err := lookupIP(target)
+	if err != nil {
+		return "", err
+	}
+	for _, ip := range ips {
+		if ip.To4() != nil {
+			return ip.String(), nil
+		}
+	}
+	if len(ips) > 0 {
+		return ips[0].String(), nil
+	}
+	return "", fmt.Errorf("no IP address found for %s", target)
+}
+
+func parseIPRouteGet(output string) (via string, dev string, src string) {
+	fields := strings.Fields(output)
+	for i := 0; i+1 < len(fields); i++ {
+		switch fields[i] {
+		case "via":
+			via = fields[i+1]
+		case "dev":
+			dev = fields[i+1]
+		case "src":
+			src = fields[i+1]
+		}
+	}
+	return via, dev, src
 }
 
 func traceRouteMac(target string) ([]types.TraceHop, error) {
 	// Use traceroute on macOS
-	output, err := commandRunner("traceroute", "-n", "-m", "30", target)
+	output, err := commandRunner("traceroute", "-n", "-m", "12", "-q", "3", "-w", "1", target)
 	if err != nil {
 		return nil, fmt.Errorf("traceroute failed: %w", err)
 	}
 
-	return parseTracerouteOutput(string(output))
+	hops, err := parseTracerouteOutput(string(output))
+	if err != nil {
+		return nil, err
+	}
+	return annotateTraceMode(hops), nil
 }
 
 func traceRouteWindows(target string) ([]types.TraceHop, error) {
 	// Use tracert on Windows
-	output, err := commandRunner("tracert", "-d", "-h", "30", "-w", "2000", target)
+	output, err := commandRunner("tracert", "-d", "-h", "12", "-w", "1000", target)
 	if err != nil {
 		return nil, fmt.Errorf("tracert failed: %w", err)
 	}
 
-	return parseWindowsTraceOutput(string(output))
+	hops, err := parseWindowsTraceOutput(string(output))
+	if err != nil {
+		return nil, err
+	}
+	return annotateTraceMode(hops), nil
 }
 
 func parseTracerouteOutput(output string) ([]types.TraceHop, error) {
